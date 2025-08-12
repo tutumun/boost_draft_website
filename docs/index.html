@@ -300,6 +300,10 @@
 
   <div class="footspace" aria-hidden="true"></div>
 
+  <!-- ！！重要：初期化で参照するため、#toTop をスクリプトの「前」に配置！！
+       これにより早期 return が発生せず、CSV 読込が確実に実行されます。 -->
+  <button id="toTop" class="to-top" type="button" aria-label="先頭へ戻る">▲</button>
+
   <!-- =========================================
        JS：インタラクション（スクロールスパイは簡易）
        ========================================= -->
@@ -343,8 +347,8 @@
     const loadmoreBtn = document.getElementById('loadmore');
     const observerEl = document.getElementById('observer');
     const toTopBtn = document.getElementById('toTop');
-    if(!cardsWrap || !q || !hit || !loadmoreBtn || !observerEl || !toTopBtn) return;
-  
+    if(!cardsWrap || !q || !hit || !loadmoreBtn || !observerEl || !toTopBtn) return; // ← ここで null だと何も動かなかった
+
     // ---- 正規化ユーティリティ ----
     const toHira = (str) => {
       if(!str) return '';
@@ -372,7 +376,7 @@
       }
       return 'other';
     };
-  
+
     // ---- CSV パーサ ----
     function parseCSV(text){
       const rows = [];
@@ -405,7 +409,7 @@
         return o;
       });
     }
-  
+
     // ---- SNS: URL配列→HTML生成（ドメインで種類判別）----
     function parseSNS(raw){
       if(!raw) return [];
@@ -452,14 +456,14 @@
       }).join('');
       return `<div class="sns" aria-label="SNSリンク">${items}</div>`;
     }
-  
+
     // ---- 状態と描画（段階表示） ----
     let allCards = [];            // 生成された <article> 要素の配列（全件）
     let filtered = [];            // フィルタ適用後の配列
     const PAGE_SIZE = 24;         // 初期/追加の表示件数
     let visibleCount = PAGE_SIZE; // 現在の表示上限
     let state = { text:'', row:'all' };
-  
+
     function matchText(card, needle){
       if(!needle) return true;
       const target = [card.dataset.name, card.dataset.pn, card.dataset.space].map(toHira).join('|');
@@ -493,7 +497,7 @@
       visibleCount += PAGE_SIZE;
       render();
     }
-  
+
     // ---- イベント：検索・50音・上へ戻る ----
     let timer = 0;
     q.addEventListener('input', (e) => {
@@ -516,13 +520,13 @@
         applyFilter();
       });
     });
-  
+
     // 上へ戻る
     toTopBtn.addEventListener('click', () => window.scrollTo({top:0, behavior:'smooth'}));
     window.addEventListener('scroll', () => {
       toTopBtn.classList.toggle('is-show', window.scrollY > 600);
     }, {passive:true});
-  
+
     // ---- URLハッシュ同期（共有用） ----
     const applyHash = () => {
       const hash = new URLSearchParams(location.hash.replace(/^#/, ''));
@@ -542,7 +546,7 @@
       }
     };
     window.addEventListener('hashchange', applyHash);
-  
+
     // ---- データロード＆カード生成 ----
     async function loadAndRender(){
       try{
@@ -551,10 +555,10 @@
         let text = await res.text();
         text = text.replace(/^\uFEFF/, '');
         const items = csvToObjects(text);
-  
+
         cardsWrap.innerHTML = '';
         allCards.length = 0;
-  
+
         for(const it of items){
           const name  = it.name || '';
           const pn    = it.pn || '';
@@ -564,21 +568,21 @@
           const desc  = it.desc || '';
           const snsRaw= it.sns || ''; // ← 複数URL対応
           const sns   = parseSNS(snsRaw);
-  
+
           // kana 決定（kigyou 明示 or 自動）
           let kana = (it.kana || '').toLowerCase();
           if(!kana){
             if(space.includes('企業') || cat.includes('企業')) kana = 'kigyou';
             else kana = kanaRowKey(name || pn);
           }
-  
+
           const art = document.createElement('article');
           art.className = 'card card--circle';
           art.dataset.name = name;
           art.dataset.pn = pn;
           art.dataset.space = space;
           art.dataset.kana = kana;
-  
+
           // カード本体（区分は表示しない）
           const thumbHtml = thumb ? 
             `<img class="circle__thumb" src="${escapeHTML(thumb)}" alt="${escapeHTML(name)} のサムネイル" />` : '';
@@ -597,23 +601,23 @@
           cardsWrap.appendChild(art);
           allCards.push(art);
         }
-  
+
         // 初期状態
         setKanaPressed('all');
         state.text = '';
         state.row  = 'all';
         applyFilter();      // ← filtered を作って render
-  
+
       }catch(err){
         console.error(err);
         cardsWrap.innerHTML = `<p class="note">サークル一覧の読み込みに失敗しました。時間をおいて再読み込みしてください。</p>`;
         hit.textContent = '0';
       }
     }
-  
+
     // ---- さらに表示（手動） ----
     loadmoreBtn.addEventListener('click', showMore);
-  
+
     // ---- 無限読み足し（画面下に来たら自動で showMore）----
     const io = new IntersectionObserver((entries) => {
       const ent = entries[0];
@@ -624,13 +628,10 @@
       }
     }, {root:null, threshold:1.0});
     io.observe(observerEl);
-  
+
     // ---- 初期ロード ----
     loadAndRender().then(applyHash);
   })();
   </script>
-
-  <!-- 先頭へ戻る（フローティング） -->
-  <button id="toTop" class="to-top" type="button" aria-label="先頭へ戻る">▲</button>
 </body>
 </html>
