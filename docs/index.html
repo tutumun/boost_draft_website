@@ -100,6 +100,27 @@
 
     /* フッタ的余白 */
     .footspace{height:40px}
+
+    /* ========== 追加: 段階表示＆SNS＆上部へ戻る ========== */
+	/* さらに表示ボタン */
+	.loadmore-wrap{display:flex;justify-content:center;margin:12px 0 0}
+	.loadmore{padding:10px 16px;border:1px solid var(--c-line);border-radius:8px;background:#fff;cursor:pointer}
+	.loadmore[disabled]{opacity:.5;cursor:default}
+
+	/* 無限読み足しトリガー（画面外の見えない線） */
+	.observer{width:100%;height:1px}
+
+	/* SNSリンクの水平リスト */
+	.sns{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+	.sns a{display:inline-flex;align-items:center;gap:6px;padding:6px 8px;border:1px solid var(--c-line);
+	  border-radius:999px;background:#fff;font-size:.9rem}
+	.sns .i{width:16px;height:16px;display:inline-block}
+
+	/* 先頭へ戻る */
+	.to-top{position:fixed;right:16px;bottom:16px;z-index:30;padding:10px 12px;border-radius:999px;
+	  background:#0f172a;color:#fff;opacity:.85;display:none}
+	.to-top.is-show{display:block}
+
   </style>
 </head>
 <body>
@@ -234,6 +255,13 @@
 
     <!-- カード一覧（CSVから生成） -->
     <div class="cards" id="circle-cards"></div>
+    <!-- さらに表示ボタン（手動読み足し用） -->
+	<div class="loadmore-wrap">
+	  <button id="loadmore" class="loadmore" type="button">さらに表示</button>
+	</div>
+	<!-- 無限読み足しの観測点（画面下） -->
+	<div id="observer" class="observer" aria-hidden="true"></div>
+
   </section>
 
   <!-- =========================================
@@ -300,13 +328,11 @@
        ========================================= -->
   <script>
   /*
-    目的：
-      - docs/content/circle-list.csv を fetch → カードDOMを生成
-      - キーワード検索（部分一致）と 50音行フィルタを実装
-      - 企業フィルタ（kana='kigyou'）に対応
-    注意：
-      - file:// 直開きでは fetch が失敗するため、ローカル確認はHTTPサーバで
-      - CSVのヘッダ：name,pn,space,cat,thumb,kana,desc
+    サークル一覧：CSV → カード生成 → 検索/50音/企業 → 段階表示 + 自動読み足し + SNSリンク
+    CSVヘッダ想定：
+      name,pn,space,cat,thumb,kana,desc,sns
+    - sns は複数URLを "空白/カンマ/|" 区切りで記述可
+    - 区分(cat)はカード表示では非表示（仕様変更）
   */
   (function(){
     // ---- 要素取得 ----
@@ -314,17 +340,19 @@
     const q = document.getElementById('circle-q');
     const hit = document.getElementById('hit');
     const kanaBtns = Array.from(document.querySelectorAll('.kana__btn'));
-    if(!cardsWrap || !q || !hit) return;
-
-    // ---- 正規化：NFKC → カナ→ひらがな → 空白除去（検索の揺れ吸収） ----
+    const loadmoreBtn = document.getElementById('loadmore');
+    const observerEl = document.getElementById('observer');
+    const toTopBtn = document.getElementById('toTop');
+    if(!cardsWrap || !q || !hit || !loadmoreBtn || !observerEl || !toTopBtn) return;
+  
+    // ---- 正規化ユーティリティ ----
     const toHira = (str) => {
       if(!str) return '';
       str = str.replace(/^\uFEFF/, '').normalize('NFKC');
       str = str.replace(/[\u30A1-\u30F6]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0x60));
       return str.replace(/\s+/g, '').toLowerCase();
     };
-
-    // ---- 50音行キー推定（kana未指定時のみ使用。企業はここでは判定しない） ----
+    const escapeHTML = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     const ROW = {
       a: 'あいうえおぁぃぅぇぉ',
       k: 'かきくけこがぎぐげご',
@@ -344,8 +372,8 @@
       }
       return 'other';
     };
-
-    // ---- 簡易CSVパーサ（クォート・カンマ対応の手組み） ----
+  
+    // ---- CSV パーサ ----
     function parseCSV(text){
       const rows = [];
       let i=0, field='', row=[], inQuote=false;
@@ -377,138 +405,132 @@
         return o;
       });
     }
-
-    // ---- カード描画 ----
-    let cards = [];
-    async function loadAndRender(){
-      try{
-        const res = await fetch('./content/circle-list.csv', {cache:'no-store'});
-        if(!res.ok) throw new Error('CSVの読み込みに失敗: ' + res.status);
-        let text = await res.text();
-        text = text.replace(/^\uFEFF/, '');
-
-        const items = csvToObjects(text);
-        cardsWrap.innerHTML = '';
-
-        for(const it of items){
-          const name  = it.name || '';
-          const pn    = it.pn || '';
-          const space = it.space || '';
-          const cat   = it.cat || '';
-          const thumb = it.thumb || '';
-          const desc  = it.desc || '';
-
-          // --- kana 決定ルール ---
-          // 1) CSVで 'kigyou' 明示 → 企業
-          // 2) space or cat に「企業」含む → 自動で 'kigyou'
-          // 3) それ以外 → サークル名/PN 先頭から50音キー推定
-          let kana = (it.kana || '').toLowerCase();
-          if(!kana){
-            if(space.includes('企業') || cat.includes('企業')) kana = 'kigyou';
-            else kana = kanaRowKey(name || pn);
-          }
-
-          const art = document.createElement('article');
-          art.className = 'card card--circle';
-          art.dataset.name = name;
-          art.dataset.pn = pn;
-          art.dataset.space = space;
-          art.dataset.cat = cat;
-          art.dataset.kana = kana;
-
-          if(thumb){
-            // サムネありレイアウト
-            art.innerHTML = `
-              <div class="circle__row">
-                <img class="circle__thumb" src="${escapeHTML(thumb)}" alt="${escapeHTML(name)} のサムネイル" />
-                <div>
-                  <div class="circle__head">
-                    <div class="circle__title">${escapeHTML(name)} <span class="circle__space">${escapeHTML(space)}</span></div>
-                    <div class="circle__meta">PN：${escapeHTML(pn)}／区分：${escapeHTML(cat || (kana==='kigyou'?'企業':''))}</div>
-                  </div>
-                  <div class="circle__body">${escapeHTML(desc)}</div>
-                </div>
-              </div>
-            `;
-          }else{
-            // テキストのみ
-            art.innerHTML = `
-              <div class="circle__head">
-                <div class="circle__title">${escapeHTML(name)} <span class="circle__space">${escapeHTML(space)}</span></div>
-                <div class="circle__meta">PN：${escapeHTML(pn)}／区分：${escapeHTML(cat || (kana==='kigyou'?'企業':''))}</div>
-              </div>
-              <div class="circle__body">${escapeHTML(desc)}</div>
-            `;
-          }
-
-          cardsWrap.appendChild(art);
-        }
-
-        cards = Array.from(cardsWrap.querySelectorAll('.card--circle'));
-        // 初期状態：全件
-        setKanaPressed('all');
-        state.text = '';
-        state.row  = 'all';
-        render();
-      }catch(err){
-        console.error(err);
-        cardsWrap.innerHTML = `<p class="note">サークル一覧の読み込みに失敗しました。時間をおいて再読み込みしてください。</p>`;
-        hit.textContent = '0';
-      }
+  
+    // ---- SNS: URL配列→HTML生成（ドメインで種類判別）----
+    function parseSNS(raw){
+      if(!raw) return [];
+      // 空白/カンマ/縦棒区切りを許容。URL以外は弾く。
+      const parts = raw.split(/[\s,|]+/).map(s => s.trim()).filter(Boolean);
+      const uniq = Array.from(new Set(parts));
+      return uniq.filter(u => /^https?:\/\//i.test(u));
     }
-
-    // ---- 検索・フィルタ ----
-    const escapeHTML = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    function snsKind(u){
+      try{
+        const h = new URL(u).hostname.replace(/^www\./, '');
+        if (/(x\.com|twitter\.com)$/i.test(h)) return 'x';
+        if (/pixiv\.net$/i.test(h)) return 'pixiv';
+        if (/booth\.pm$/i.test(h)) return 'booth';
+        if (/instagram\.com$/i.test(h)) return 'ig';
+        if (/bsky\.app$/i.test(h)) return 'bsky';
+        if (/youtube\.com$|youtu\.be$/i.test(h)) return 'yt';
+        return 'web';
+      }catch{ return 'web'; }
+    }
+    function snsIcon(kind){
+      // 小型のインラインSVG（外部依存なし）
+      const map = {
+        x: '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3h4.3l5 7.2L17.5 3H21l-7.4 10.6L21 21h-4.3L11 13.7 6.5 21H3l7.6-10.9L3 3z"/></svg>',
+        pixiv: '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/></svg>',
+        booth: '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="18" height="12" rx="2"/></svg>',
+        ig: '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="4"/><circle cx="12" cy="12" r="4"/><circle cx="17" cy="7" r="1"/></svg>',
+        bsky: '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 10c2-4 8-6 10 0-3 1-6 3-10 9-4-6-7-8-10-9 2-6 8-4 10 0z"/></svg>',
+        yt: '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 12c0-3-1-5-1-5s-1-2-4-2H7C4 5 3 7 3 7s-1 2-1 5 1 5 1 5 1 2 4 2h10c3 0 4-2 4-2s1-2 1-5z"/><path d="M10 9v6l5-3-5-3z" fill="#fff"/></svg>',
+        web: '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 4 3 14 0 18M7 5c2 3 2 11 0 14M17 5c-2 3-2 11 0 14"/></svg>'
+      };
+      return map[kind] || map.web;
+    }
+    function snsLabel(kind){
+      return {x:'X', pixiv:'Pixiv', booth:'Booth', ig:'Instagram', bsky:'Bluesky', yt:'YouTube', web:'Web'}[kind] || 'Web';
+    }
+    function buildSNSHtml(urls){
+      if(!urls.length) return '';
+      const items = urls.map(u => {
+        const k = snsKind(u);
+        return `<a href="${escapeHTML(u)}" target="_blank" rel="noopener" aria-label="${snsLabel(k)}へ">
+          ${snsIcon(k)}<span>${snsLabel(k)}</span>
+        </a>`;
+      }).join('');
+      return `<div class="sns" aria-label="SNSリンク">${items}</div>`;
+    }
+  
+    // ---- 状態と描画（段階表示） ----
+    let allCards = [];            // 生成された <article> 要素の配列（全件）
+    let filtered = [];            // フィルタ適用後の配列
+    const PAGE_SIZE = 24;         // 初期/追加の表示件数
+    let visibleCount = PAGE_SIZE; // 現在の表示上限
     let state = { text:'', row:'all' };
-
-    const matchText = (card, needle) => {
+  
+    function matchText(card, needle){
       if(!needle) return true;
-      const target = [card.dataset.name, card.dataset.pn, card.dataset.space, card.dataset.cat].map(toHira).join('|');
-      return target.includes(toHira(needle)); // 部分一致（前方一致も包含）
-    };
-    const matchRow = (card, row) => {
+      const target = [card.dataset.name, card.dataset.pn, card.dataset.space].map(toHira).join('|');
+      return target.includes(toHira(needle));
+    }
+    function matchRow(card, row){
       if(row === 'all') return true;
-      return (card.dataset.kana || 'other') === row; // ← 'kigyou' もここで判定
-    };
-    const render = () => {
+      return (card.dataset.kana || 'other') === row; // 'kigyou' もここで判定
+    }
+    function applyFilter(){
+      // フィルタを適用し、表示上限を初期化
+      filtered = allCards.filter(c => matchText(c, state.text) && matchRow(c, state.row));
+      visibleCount = PAGE_SIZE;
+      render();
+    }
+    function render(){
+      // 一旦すべて非表示 → 先頭 visibleCount 件だけ表示
       let count = 0;
-      for(const card of cards){
-        const ok = matchText(card, state.text) && matchRow(card, state.row);
-        card.style.display = ok ? '' : 'none';
-        if(ok) count++;
+      for(const c of allCards){ c.style.display = 'none'; }
+      for(let i=0; i<filtered.length && i<visibleCount; i++){
+        filtered[i].style.display = '';
+        count++;
       }
-      hit.textContent = String(count);
-    };
-
-    // 入力デバウンス
+      hit.textContent = String(filtered.length);
+      // さらに表示ボタンの活性/非活性
+      const more = filtered.length > visibleCount;
+      loadmoreBtn.disabled = !more;
+    }
+    function showMore(){
+      // 表示上限を加算して再描画
+      visibleCount += PAGE_SIZE;
+      render();
+    }
+  
+    // ---- イベント：検索・50音・上へ戻る ----
     let timer = 0;
     q.addEventListener('input', (e) => {
-      const v = e.target.value || '';
       clearTimeout(timer);
-      timer = setTimeout(() => { state.text = v; render(); updateHash(); }, 120);
+      const v = e.target.value || '';
+      timer = setTimeout(() => {
+        state.text = v;
+        updateHash();
+        applyFilter();
+      }, 120);
     });
-
-    // 50音＋企業ボタン
     const setKanaPressed = (key) => {
       kanaBtns.forEach(btn => btn.setAttribute('aria-pressed', String(btn.dataset.kana === key)));
     };
     kanaBtns.forEach(btn => {
       btn.addEventListener('click', () => {
-        state.row = btn.dataset.kana;   // 'kigyou' をそのまま状態に入れる
+        state.row = btn.dataset.kana;
         setKanaPressed(state.row);
-        render();
         updateHash();
+        applyFilter();
       });
     });
-
-    // URLハッシュ同期（#q=検索語&row=kigyou などを共有可）
+  
+    // 上へ戻る
+    toTopBtn.addEventListener('click', () => window.scrollTo({top:0, behavior:'smooth'}));
+    window.addEventListener('scroll', () => {
+      toTopBtn.classList.toggle('is-show', window.scrollY > 600);
+    }, {passive:true});
+  
+    // ---- URLハッシュ同期（共有用） ----
     const applyHash = () => {
       const hash = new URLSearchParams(location.hash.replace(/^#/, ''));
       const qv = hash.get('q') || '';
       const rv = hash.get('row') || 'all';
       if(q.value !== qv){ q.value = qv; state.text = qv; }
       if(state.row !== rv){ state.row = rv; setKanaPressed(rv); }
-      render();
+      applyFilter();
     };
     const updateHash = () => {
       const params = new URLSearchParams();
@@ -520,10 +542,95 @@
       }
     };
     window.addEventListener('hashchange', applyHash);
-
-    // 初期ロード
+  
+    // ---- データロード＆カード生成 ----
+    async function loadAndRender(){
+      try{
+        const res = await fetch(`./content/circle-list.csv?ts=${Date.now()}`);
+        if(!res.ok) throw new Error('CSVの読み込みに失敗: ' + res.status);
+        let text = await res.text();
+        text = text.replace(/^\uFEFF/, '');
+        const items = csvToObjects(text);
+  
+        cardsWrap.innerHTML = '';
+        allCards.length = 0;
+  
+        for(const it of items){
+          const name  = it.name || '';
+          const pn    = it.pn || '';
+          const space = it.space || '';
+          const cat   = it.cat || '';
+          const thumb = it.thumb || '';
+          const desc  = it.desc || '';
+          const snsRaw= it.sns || ''; // ← 複数URL対応
+          const sns   = parseSNS(snsRaw);
+  
+          // kana 決定（kigyou 明示 or 自動）
+          let kana = (it.kana || '').toLowerCase();
+          if(!kana){
+            if(space.includes('企業') || cat.includes('企業')) kana = 'kigyou';
+            else kana = kanaRowKey(name || pn);
+          }
+  
+          const art = document.createElement('article');
+          art.className = 'card card--circle';
+          art.dataset.name = name;
+          art.dataset.pn = pn;
+          art.dataset.space = space;
+          art.dataset.kana = kana;
+  
+          // カード本体（区分は表示しない）
+          const thumbHtml = thumb ? 
+            `<img class="circle__thumb" src="${escapeHTML(thumb)}" alt="${escapeHTML(name)} のサムネイル" />` : '';
+          const rowStart = thumb ? `<div class="circle__row">${thumbHtml}<div>` : `<div>`;
+          const rowEnd   = thumb ? `</div></div>` : `</div>`;
+          art.innerHTML = `
+            ${rowStart}
+              <div class="circle__head">
+                <div class="circle__title">${escapeHTML(name)} <span class="circle__space">${escapeHTML(space)}</span></div>
+                <div class="circle__meta">PN：${escapeHTML(pn)}</div>
+              </div>
+              <div class="circle__body">${escapeHTML(desc)}</div>
+              ${buildSNSHtml(sns)}
+            ${rowEnd}
+          `;
+          cardsWrap.appendChild(art);
+          allCards.push(art);
+        }
+  
+        // 初期状態
+        setKanaPressed('all');
+        state.text = '';
+        state.row  = 'all';
+        applyFilter();      // ← filtered を作って render
+  
+      }catch(err){
+        console.error(err);
+        cardsWrap.innerHTML = `<p class="note">サークル一覧の読み込みに失敗しました。時間をおいて再読み込みしてください。</p>`;
+        hit.textContent = '0';
+      }
+    }
+  
+    // ---- さらに表示（手動） ----
+    loadmoreBtn.addEventListener('click', showMore);
+  
+    // ---- 無限読み足し（画面下に来たら自動で showMore）----
+    const io = new IntersectionObserver((entries) => {
+      const ent = entries[0];
+      if(ent && ent.isIntersecting){
+        if(filtered.length > visibleCount){
+          showMore();
+        }
+      }
+    }, {root:null, threshold:1.0});
+    io.observe(observerEl);
+  
+    // ---- 初期ロード ----
     loadAndRender().then(applyHash);
   })();
   </script>
+
+  <!-- 先頭へ戻る（フローティング） -->
+  <button id="toTop" class="to-top" type="button" aria-label="先頭へ戻る">▲</button>
 </body>
 </html>
