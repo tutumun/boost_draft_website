@@ -115,7 +115,10 @@
 	.sns a{display:inline-flex;align-items:center;gap:6px;padding:6px 8px;border:1px solid var(--c-line);
 	  border-radius:999px;background:#fff;font-size:.9rem}
 	.sns .i{width:16px;height:16px;display:inline-block}
-
+    /* SNSボタン内のfaviconを16pxで表示（角丸で見栄えUP） */
+    .sns .fav{
+      width:16px; height:16px; border-radius:4px; object-fit:cover;
+    }
 	/* 先頭へ戻る */
 	.to-top{position:fixed;right:16px;bottom:16px;z-index:30;padding:10px 12px;border-radius:999px;
 	  background:#0f172a;color:#fff;opacity:.85;display:none}
@@ -410,29 +413,88 @@
       });
     }
 
-    // ---- SNS: URL配列→HTML生成（ドメインで種類判別）----
+    // ========================
+    // SNSリンク: URL配列の正規化
+    //  - スキームなしURLを https 化
+    //  - 重複を排除
+    // ========================
     function parseSNS(raw){
       if(!raw) return [];
-      // 区切りは「空白 / カンマ / 縦棒」を許容
-      const parts = raw.split(/[\s,|]+/).map(s => s.trim()).filter(Boolean);
+      const parts = String(raw).split(/[\s,|]+/).map(s => s.trim()).filter(Boolean);
 
       const norm = parts.map(u => {
-        // 先頭・末尾の引用符や全角スペース・句読点を除去
+        // 前後の引用符や句読点を除去（CSVゆれ対策）
         u = u.replace(/^['"［「『（(]+|['"］」』）)。,、]+$/g, '').trim();
-
-        // スキームがない場合は https を補完（例: "pixiv.net/users/12345"）
-        if (/^\/\//.test(u)) u = 'https:' + u;        // "//example.com" → "https://example.com"
+        // "//example.com" → "https://example.com"
+        if (/^\/\//.test(u)) u = 'https:' + u;
+        // "pixiv.net/..." → "https://pixiv.net/..."
         if (!/^https?:\/\//i.test(u) && /\./.test(u)) u = 'https://' + u;
-
         return u;
       });
 
-      // URLとして解釈できないものは除外
+      // URLとして解釈できるものだけ残す
       const uniq = Array.from(new Set(norm));
-      return uniq.filter(u => {
-        try { new URL(u); return true; } catch { return false; }
-      });
+      return uniq.filter(u => { try{ new URL(u); return true; } catch{ return false; } });
     }
+
+    // ========================
+    // favicon取得ポリシー
+    // ①（本番用 / コメントアウト）：WPにキャッシュしたPNGを配信
+    //    例: /wp-content/uploads/favicons/example.com.png
+    //    ※本番移行時にこの関数を有効化し、②を無効化してください。
+    // ========================
+    /*
+    function faviconURL(host){
+      // 本番：サーバー側で事前生成しておく（WP-Cronで週1更新など）
+      return `/wp-content/uploads/favicons/${host}.png`;
+    }
+    */
+
+    // ========================
+    // ②（ドラフト用 / 有効）：CDNから取得（Google S2）
+    //    相手サイトへ直接アクセスしないので負荷集中を回避
+    // ========================
+    function faviconURL(host, size=32){
+      return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=${size}`;
+    }
+
+    // URL → ホスト名（失敗時はnull）
+    function hostFromUrl(u){
+      try { return new URL(u).hostname; } catch { return null; }
+    }
+
+    // ========================
+    // SNSリンクHTML生成：favicon画像 + ラベル
+    //  - faviconはCDNから取得、失敗時は非表示（ラベルのみ）
+    //  - 参照元を送らないために no-referrer を付与
+    // ========================
+    function buildSNSHtml(urls){
+      if(!urls.length) return '';
+      const items = urls.map(u => {
+        const host = hostFromUrl(u);
+        const fav  = host ? faviconURL(host, 32) : '';
+        const label= (function(){
+          // 既存の snsKind/snsLabel を活用（無ければ "Web"）
+          try{
+            const k = snsKind(u);
+            return (snsLabel && snsLabel(k)) || 'Web';
+          }catch{ return 'Web'; }
+        })();
+
+        const favImg = fav
+          ? `<img class="fav" src="${fav}" loading="lazy" decoding="async"
+                   referrerpolicy="no-referrer" alt="" aria-hidden="true"
+                   onerror="this.style.display='none'">`
+          : '';
+
+        return `<a href="${escapeHTML(u)}" target="_blank" rel="noopener" aria-label="${label}へ">
+                  ${favImg}<span>${label}</span>
+                </a>`;
+      }).join('');
+
+      return `<div class="sns" aria-label="SNSリンク">${items}</div>`;
+    }
+
     function snsKind(u){
       try{
         const h = new URL(u).hostname.replace(/^www\./, '');
