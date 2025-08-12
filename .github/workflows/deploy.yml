@@ -1,0 +1,54 @@
+# GitHub Pages: docs/ を自動デプロイ
+# ------------------------------------------------------------
+# 使い方：
+# 1) リポジトリの Settings > Pages で「Source: GitHub Actions」を選択
+# 2) main ブランチに push すると、docs/ の中身が自動公開されます
+# 3) Actions タブで進捗を確認できます（初回は Enable Actions が必要な場合あり）
+
+name: Deploy Pages
+
+on:
+  push:
+    branches:
+      - main            # ← デプロイ対象ブランチ（必要に応じて変更）
+    paths:
+      - "docs/**"       # docs/ 配下に変更があるときのみ実行
+      - ".github/workflows/deploy.yml"
+  workflow_dispatch:     # 手動実行も可能にする
+
+# Pages デプロイに必要な権限
+permissions:
+  contents: read
+  pages: write           # ← 必須
+  id-token: write        # ← 必須（deploy-pages がOIDCで使用）
+
+# 同時実行を制御（途中のジョブがあればキャンセルして最新だけをデプロイ）
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # GitHub Pages の設定（内部的に必要）
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      # docs/ の静的ファイルを成果物としてアップロード
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs    # ← 公開したいディレクトリ
+
+      # アップロードしたアーティファクトを Pages にデプロイ
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
