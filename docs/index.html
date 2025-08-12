@@ -1,560 +1,747 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ja">
 <head>
   <meta charset="utf-8" />
+  <!-- ビューポート：SPでの初期スケールを適切に -->
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>ブースト！公式サイト（ドラフト）</title>
-  <meta name="description" content="ブースト！イベント公式サイト（ドラフト）。開催概要・一般参加・サークル参加・サークル一覧・アクセス・Q&A・お問い合わせ。" />
-  <!--
-    フル版単一HTML（GitHub Pages向け）。
-    - 外部依存なし（バニラJS/CSSのみ）
-    - 固定ナビ / アンカー導線 / 50音フィルタ + 検索
-    - サークル一覧は CSV 読み込み（content/circle-list.csv）失敗時は埋め込みダミーデータにフォールバック
-    - 「区分」は非表示、SNSリンク複数対応
-    - 初期状態ではサークル一覧は“行未選択”のため非表示 → 長いスクロールを回避
-  -->
-  <style>
-    /* ===== リセットに近い最小限 ===== */
-    *, *::before, *::after { box-sizing: border-box; }
-    html { scroll-behavior: smooth; }
-    body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans JP", "Hiragino Kaku Gothic ProN", Meiryo, sans-serif; line-height: 1.6; color: #111; background: #fff; }
-    img { max-width: 100%; height: auto; vertical-align: middle; }
-    a { color: #0a58ca; text-decoration: none; }
-    a:hover { text-decoration: underline; }
+  <meta name="description" content="同人イベント「ブースト！」の公式サイト（ドラフト版）。開催概要・一般/サークル向けガイド・サークル一覧・アクセス・Q&A・お問い合わせ。">
 
-    /* ===== カラーパレット（5色以内） ===== */
-    :root {
-      --accent: #0057D9;   /* 強調色 */
-      --border: #E5E7EB;   /* 枠線 */
-      --warn:   #B45309;   /* 警告 */
-      --bg:     #F8FAFC;   /* 背景 */
-      --text:   #111111;   /* 本文 */
+  <!-- =========================================================
+       ベースCSS（バニラCSSのみ／外部依存なし）
+       - 色は5色以内（本文/強調/境界/警告/背景）
+       ========================================================= -->
+  <style>
+    :root{
+      /* -------------------------------------------
+         カラーパレット（5色以内）
+         brand: ブランド強調色（可変項目）
+         ------------------------------------------- */
+      --bg: #ffffff;
+      --text: #111111;
+      --muted: #6b7280;     /* 説明/補助の文字色 */
+      --brand: #0ea5e9;     /* ブランドカラー（例：#0ea5e9） */
+      --line: #e5e7eb;      /* 罫線/境界 */
+      --warn: #ef4444;      /* 警告 */
+
+      /* コンポーネント寸法 */
+      --maxw: 1080px;
+      --nav-h: 56px;
+      --radius: 14px;
+      --shadow: 0 6px 24px rgba(0,0,0,.06);
     }
 
-    /* ===== 固定ナビ ===== */
-    .site-header { position: sticky; top: 0; z-index: 50; background: #fff; border-bottom: 1px solid var(--border); }
-    .nav-wrap { display: flex; gap: .75rem; overflow-x: auto; padding: .75rem 1rem; -webkit-overflow-scrolling: touch; scrollbar-width: thin; }
-    .brand { font-weight: 700; margin-right: .5rem; white-space: nowrap; }
-    .nav { display: flex; gap: .5rem; }
-    .nav a { white-space: nowrap; padding: .25rem .5rem; border-radius: .5rem; border: 1px solid transparent; }
-    .nav a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-    .nav a:hover { background: var(--bg); }
+    /* リセット（最小限） */
+    html, body { margin:0; padding:0; background:var(--bg); color:var(--text); }
+    body { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans JP","Hiragino Kaku Gothic ProN","Meiryo",sans-serif; line-height:1.7; }
+    img { max-width:100%; display:block; }
+    a { color: var(--brand); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    h1,h2,h3 { line-height:1.3; }
+    h1 { font-size: clamp(1.6rem, 2vw + 1rem, 2.2rem); }
+    h2 { font-size: clamp(1.2rem, 1.3vw + .9rem, 1.6rem); }
+    p,li,dd,dt { font-size: clamp(.98rem, .2vw + .9rem, 1.05rem); }
+    small { color: var(--muted); }
 
-    /* ===== セクション ===== */
-    section { padding: 2rem 1rem; border-bottom: 1px solid var(--border); scroll-margin-top: 4.25rem; }
-    .container { max-width: 1100px; margin: 0 auto; }
-    h1, h2 { line-height: 1.25; }
-    h1 { font-size: clamp(1.5rem, 1.2rem + 1.5vw, 2.25rem); margin: 0 0 .75rem; }
-    h2 { font-size: clamp(1.25rem, 1.1rem + 1vw, 1.75rem); margin: 0 0 1rem; }
-    .lead { color: #333; }
+    /* コンテナ */
+    .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 16px; }
 
-    /* ===== ヒーロー ===== */
-    .hero { background: linear-gradient(180deg, #ffffff 0%, #f6f9ff 100%); }
-    .hero-grid { display: grid; grid-template-columns: 1.2fr .8fr; gap: 1rem; align-items: center; }
-    @media (max-width: 860px){ .hero-grid { grid-template-columns: 1fr; } }
-    .hero-card { background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 1rem; box-shadow: 0 2px 8px rgba(0,0,0,.04); }
-    .hero-meta { display: grid; grid-template-columns: max-content 1fr; gap: .25rem .75rem; margin: .75rem 0; }
-    .cta { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .75rem; }
-    .btn { display: inline-block; padding: .5rem .9rem; border-radius: 999px; border: 1px solid var(--accent); color: #fff; background: var(--accent); font-weight: 600; }
-    .btn.secondary { color: var(--accent); background: #fff; }
+    /* -------------------------------------------------
+       固定ナビ：常時表示＋横スクロール
+       - スペック6) に基づく
+       ------------------------------------------------- */
+    .topnav {
+      position: sticky;
+      top: 0; /* テーマの固定ヘッダーがある場合はここを調整（可変項目） */
+      z-index: 50;
+      background: rgba(255,255,255,.85);
+      backdrop-filter: blur(6px);
+      border-bottom: 1px solid var(--line);
+      height: var(--nav-h);
+      display: flex; align-items:center;
+      overflow-x: auto; -webkit-overflow-scrolling: touch;
+    }
+    .topnav a {
+      display:inline-block; padding: 8px 14px; margin: 0 4px;
+      color: var(--text); border:1px solid transparent; border-radius: 999px;
+      white-space: nowrap;
+    }
+    .topnav a:hover { background: #f8fafc; }
+    .topnav a.is-active { border-color: var(--brand); color: var(--brand); }
 
-    /* ===== カード＆テーブル ===== */
-    .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: .75rem; }
-    .card { border: 1px solid var(--border); border-radius: 12px; background: #fff; padding: .75rem; }
-    .muted { color: #555; font-size: .95rem; }
-    .table { width: 100%; border-collapse: collapse; }
-    .table th, .table td { border: 1px solid var(--border); padding: .5rem .6rem; text-align: left; }
+    /* -------------------------------------------------
+       HERO：左フライヤー / 右開催概要
+       - ユーザー要望「yaroufes風レイアウト」
+       ------------------------------------------------- */
+    .hero {
+      display:grid; gap: 20px;
+      grid-template-columns: 1.1fr 1fr;
+      align-items: center;
+      padding: 20px 0 28px;
+    }
+    .flyer {
+      border-radius: var(--radius);
+      overflow: hidden; box-shadow: var(--shadow);
+      border: 1px solid var(--line);
+      aspect-ratio: 4/3; /* フライヤー比率の仮置き */
+      background:#f3f4f6;
+    }
+    .outline {
+      border:1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 16px;
+      box-shadow: var(--shadow);
+      background: #fff;
+    }
+    .kv {
+      display: grid; gap: 8px;
+    }
+    .kv .row { display:flex; gap:8px; align-items: baseline; }
+    .kv .key { color: var(--muted); width: 64px; flex: 0 0 auto; font-size: .95rem; }
+    .kv .val { font-weight: 700; }
 
-    /* ===== サークル一覧 ===== */
-    .finder { display: grid; gap: .75rem; background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: .75rem; }
-    .finder .row { display: grid; gap: .5rem; }
-    @media (min-width: 720px){ .finder .row { grid-template-columns: 1fr max-content; align-items: center; } }
-    .kana { display: flex; flex-wrap: wrap; gap: .35rem; }
-    .kana button { border: 1px solid var(--border); background: #fff; padding: .35rem .45rem; border-radius: .5rem; cursor: pointer; }
-    .kana button[aria-pressed="true"] { background: var(--accent); color: #fff; border-color: var(--accent); }
-    .searchbox { width: 100%; padding: .55rem .7rem; border: 1px solid var(--border); border-radius: .5rem; }
-    .hint { font-size: .9rem; color: #444; }
-    .circle-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: .75rem; margin-top: .75rem; }
-    .circle-card { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: #fff; display: grid; grid-template-rows: 140px auto; }
-    .circle-thumb { background: #f3f4f6; display: grid; place-items: center; }
-    .circle-body { padding: .6rem .7rem .8rem; display: grid; gap: .35rem; }
-    .circle-name { font-weight: 700; }
-    .circle-meta { font-size: .9rem; color: #333; }
-    .sns { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .2rem; }
-    .chip { border: 1px solid var(--border); border-radius: 999px; padding: .15rem .5rem; font-size: .85rem; background: #fff; }
-    .empty { padding: .75rem; border: 1px dashed var(--border); border-radius: 12px; background: #fafafa; text-align: center; color: #666; }
-    .note { font-size: .9rem; color: #444; }
+    .cta {
+      display:flex; gap: 12px; flex-wrap:wrap; margin-top: 8px;
+    }
+    .btn {
+      display:inline-flex; align-items:center; gap:8px;
+      padding: 10px 14px; border-radius: 999px;
+      border:1px solid var(--brand); color: var(--brand); background: #fff;
+      font-weight:700;
+    }
+    .btn.primary { background: var(--brand); color:#fff; }
+    .btn:hover { opacity:.9; text-decoration: none; }
 
-    /* ===== フッター ===== */
-    footer { padding: 2rem 1rem; color: #333; background: var(--bg); }
-    .small { font-size: .9rem; color: #444; }
+    @media (max-width: 920px){
+      .hero{ grid-template-columns: 1fr; }
+    }
+
+    /* 見出しが固定ナビに隠れないように（spec 6） */
+    section { scroll-margin-top: calc(var(--nav-h) + 16px); }
+
+    /* -------------------------------------------------
+       アコーディオン（Comiket風に「閉じられる」UI）
+       - details/summaryを使うことでアクセシブルに
+       ------------------------------------------------- */
+    details.accordion{
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      margin: 16px 0;
+      background: #fff;
+      box-shadow: var(--shadow);
+    }
+    details.accordion > summary{
+      list-style: none;
+      cursor: pointer;
+      padding: 14px 16px;
+      font-weight:700;
+      display:flex; align-items:center; justify-content:space-between;
+    }
+    details.accordion > summary::-webkit-details-marker{ display:none; }
+    .acc-body{ padding: 0 16px 16px; border-top:1px solid var(--line); }
+
+    /* テーブル（当日スケジュール） */
+    .tbl{ width:100%; border-collapse: collapse; }
+    .tbl th, .tbl td{ border-bottom:1px solid var(--line); padding:10px; text-align:left; }
+    .tbl th{ color: var(--muted); font-weight:700; width: 120px; }
+
+    /* -------------------------------------------------
+       サークル一覧（検索/50音/ページング/SNSリンク）
+       ------------------------------------------------- */
+    .circle-tools{
+      display:flex; flex-wrap:wrap; gap:12px; align-items:center; margin: 8px 0 12px;
+    }
+    .circle-tools input[type="search"]{
+      flex: 1 1 240px; min-width: 200px;
+      border:1px solid var(--line); border-radius: 10px; padding: 10px 12px;
+      outline: none;
+    }
+    .kana-tabs{
+      display:flex; gap:6px; overflow-x:auto; padding-bottom: 6px;
+    }
+    .kana-tabs button{
+      border:1px solid var(--line); background:#fff; color:var(--text);
+      padding: 8px 10px; border-radius: 999px; white-space: nowrap; cursor: pointer;
+    }
+    .kana-tabs button.is-active{
+      border-color: var(--brand); color: var(--brand); font-weight:700;
+    }
+
+    .circle-grid{
+      display:grid; gap: 12px;
+      grid-template-columns: repeat(4, 1fr);
+    }
+    @media (max-width: 1024px){ .circle-grid{ grid-template-columns: repeat(3, 1fr);} }
+    @media (max-width: 720px){ .circle-grid{ grid-template-columns: repeat(2, 1fr);} }
+    @media (max-width: 460px){ .circle-grid{ grid-template-columns: 1fr;} }
+
+    .card{
+      border:1px solid var(--line); border-radius: 14px; padding: 12px;
+      background:#fff; box-shadow: var(--shadow);
+      display:grid; grid-template-columns: 64px 1fr; gap: 12px; align-items: center;
+    }
+    .thumb{
+      width: 64px; height: 64px; border-radius: 8px; overflow: hidden; background:#f3f4f6;
+      display:flex; align-items:center; justify-content:center; border:1px solid var(--line);
+    }
+    .thumb img{ width:100%; height:100%; object-fit: cover; }
+    .meta .name{ font-weight: 800; }
+    .meta .sub{ color: var(--muted); font-size: .9rem; }
+    .meta .space{ font-size:.92rem; margin-top: 2px; }
+    .sns{
+      display:flex; gap:8px; flex-wrap:wrap; margin-top: 8px;
+    }
+    .sns a{
+      border:1px solid var(--line); border-radius: 999px; padding: 6px 10px; display:inline-flex; align-items:center; gap:6px;
+      color: var(--text); background:#fff;
+    }
+    .sns svg{ width:16px; height:16px; }
+    .grid-footer{ display:flex; justify-content:center; margin: 12px 0 2px; }
+    .loadmore{
+      padding: 10px 16px; border-radius: 999px; border:1px solid var(--brand);
+      background:#fff; color:var(--brand); cursor: pointer; font-weight:700;
+    }
+    .count { color: var(--muted); }
+
+    /* アクセス／注意ボックス */
+    .note{
+      border: 1px dashed var(--line);
+      background:#fafafa;
+      border-radius: var(--radius);
+      padding: 12px;
+    }
+
+    /* 警告メッセージ */
+    .alert{ color: var(--warn); font-weight:700; }
   </style>
 </head>
 <body>
-  <!-- ========== 固定ナビ ========== -->
-  <header class="site-header" role="banner">
-    <div class="nav-wrap container">
-      <div class="brand">🚀 ブースト！</div>
-      <nav class="nav" aria-label="主要ナビゲーション">
-        <!-- アンカーはセクションIDと一致させること -->
-        <a href="#hero">トップ</a>
-        <a href="#news">最新情報</a>
-        <a href="#schedule">当日スケジュール</a>
-        <a href="#visitor">一般参加</a>
-        <a href="#circle">サークル参加</a>
-        <a href="#catalog">サークル一覧</a>
-        <a href="#venue">会場内案内</a>
-        <a href="#access">アクセス</a>
-        <a href="#qa">Q&A</a>
-        <a href="#contact">お問い合わせ</a>
-      </nav>
-    </div>
-  </header>
 
-  <!-- ========== ヒーロー ========== -->
-  <section id="hero" class="hero" aria-labelledby="hero-title">
-    <div class="container hero-grid">
-      <div class="hero-card">
-        <h1 id="hero-title">ブースト！— 同人&創作イベント</h1>
-        <p class="lead">初めての方でも迷わない導線。開催日・会場・入場方法を最短でご案内します。</p>
-        <div class="hero-meta" aria-label="開催概要">
-          <div>開催日</div><div><strong>2025/10/12（日）</strong> 10:00–16:00</div>
-          <div>会　場</div><div><strong>ブーストホール</strong>（〇〇市△△区ホールA）</div>
-          <div>入　場</div><div>パンフ購入制 <strong>1冊 1,000円</strong>（再入場可）</div>
+  <!-- =========================================================
+       固定ナビ（横スクロール可）
+       - 各セクションへアンカーリンク
+       - scrollspy風のis-activeは最小実装（JSで切替）
+       ========================================================= -->
+  <nav class="topnav" id="topnav">
+    <div class="wrap" style="display:flex; gap:4px;">
+      <a href="#hero" class="is-active">開催概要</a>
+      <a href="#news">最新情報</a>
+      <a href="#schedule">当日スケジュール</a>
+      <a href="#general">一般参加</a>
+      <a href="#circle">サークル参加</a>
+      <a href="#circles">サークル一覧</a>
+      <a href="#access">アクセス</a>
+      <a href="#qa">Q&amp;A</a>
+      <a href="#contact">お問い合わせ</a>
+    </div>
+  </nav>
+
+  <main class="wrap">
+
+    <!-- =======================================================
+         HERO：左フライヤー / 右開催概要
+         - 左にフライヤー画像（assets/img/flyer.jpg を差し替え）
+         - 右に開催情報とCTA
+         ======================================================= -->
+    <section id="hero" class="hero">
+      <div class="flyer">
+        <!-- ここにイベントフライヤー。差し替え推奨。altは必ず意味のある説明を -->
+        <img src="./assets/img/flyer.jpg" alt="イベント公式フライヤー" loading="eager" />
+      </div>
+
+      <div class="outline">
+        <h1>ブースト！</h1>
+        <div class="kv" aria-label="開催概要">
+          <div class="row"><div class="key">開催日</div><div class="val">2025/10/12（日）</div></div>
+          <div class="row"><div class="key">時間</div><div class="val">10:00〜16:00</div></div>
+          <div class="row"><div class="key">会場</div><div class="val">〇〇コンベンションホール A館</div></div>
+          <div class="row"><div class="key">入場</div><div class="val">一般：1,000円（再入場可）</div></div>
         </div>
         <div class="cta" role="group" aria-label="主要導線">
-          <a class="btn" href="#visitor">一般参加ガイド</a>
-          <a class="btn secondary" href="#circle">サークル参加ガイド</a>
+          <a class="btn primary" href="#general">一般参加ガイド</a>
+          <a class="btn" href="#circle">サークル参加ガイド</a>
+          <a class="btn" href="#circles">サークル一覧</a>
         </div>
-        <p class="muted small">※ 記載はドラフトです。内容は予告なく変更になる場合があります。</p>
+        <small>※ 表示の料金・内容はドラフトです。確定次第更新します。</small>
       </div>
-      <div aria-hidden="true" class="hero-card">
-        <img src="assets/hero.jpg" alt="会場イメージ（サンプル画像）" />
-      </div>
-    </div>
-  </section>
+    </section>
 
-  <!-- ========== 最新情報 ========== -->
-  <section id="news" aria-labelledby="news-title">
-    <div class="container">
-      <h2 id="news-title">最新情報（最大5件）</h2>
-      <div class="cards" id="news-list" role="list">
-        <!-- JSで挿入。YYYY/MM/DD + 40文字以内見出し。 -->
+    <!-- =======================================================
+         最新情報（アコーディオン）
+         - 2〜5件。日付＋40字以内見出し
+         ======================================================= -->
+    <details class="accordion" id="news" open>
+      <summary>最新情報</summary>
+      <div class="acc-body">
+        <ul>
+          <li>2025/08/10　会場内案内（文章）を公開しました。</li>
+          <li>2025/08/05　サークル一覧の検索と50音タブを追加しました。</li>
+          <li>2025/08/01　お問い合わせ（GitHub Issueフォーム）を試験公開。</li>
+        </ul>
+        <div class="note"><small>古いお知らせはアーカイブへ移動します（最大5件表示）。</small></div>
       </div>
-      <p class="small muted">古いお知らせはアーカイブに移動します。</p>
-    </div>
-  </section>
+    </details>
 
-  <!-- ========== 当日スケジュール ========== -->
-  <section id="schedule" aria-labelledby="schedule-title">
-    <div class="container">
-      <h2 id="schedule-title">当日スケジュール</h2>
-      <div class="card">
-        <table class="table" aria-describedby="schedule-note">
-          <thead>
-            <tr><th scope="col">時刻</th><th scope="col">内容</th></tr>
-          </thead>
-          <tbody id="schedule-body">
-            <!-- JSで6〜8行挿入 -->
+    <!-- =======================================================
+         当日スケジュール（アコーディオン）
+         - 表：時刻/内容（6〜8行）
+         ======================================================= -->
+    <details class="accordion" id="schedule" open>
+      <summary>当日スケジュール</summary>
+      <div class="acc-body">
+        <table class="tbl">
+          <tbody>
+            <tr><th>09:00</th><td>サークル入場開始・搬入</td></tr>
+            <tr><th>09:30</th><td>年齢確認ブースオープン</td></tr>
+            <tr><th>10:00</th><td>一般入場開始</td></tr>
+            <tr><th>12:00</th><td>抽選会（ブークジ）</td></tr>
+            <tr><th>15:30</th><td>頒布終了アナウンス</td></tr>
+            <tr><th>16:00</th><td>イベント終了・撤収開始</td></tr>
           </tbody>
         </table>
-        <p id="schedule-note" class="note">※ 時刻・内容は予告なく変更になる場合があります。</p>
       </div>
-    </div>
-  </section>
+    </details>
 
-  <!-- ========== 一般参加 ========== -->
-  <section id="visitor" aria-labelledby="visitor-title">
-    <div class="container">
-      <h2 id="visitor-title">一般参加ガイド</h2>
-      <div class="cards">
-        <div class="card">
-          <h3>年齢確認</h3>
-          <ul>
-            <li>18歳未満の方はR-18エリアに入場できません。</li>
-            <li>顔写真付き身分証の提示をお願いする場合があります。</li>
-          </ul>
-        </div>
-        <div class="card">
-          <h3>入場・再入場</h3>
-          <ul>
-            <li>入場はパンフ購入制（<strong>1冊 1,000円</strong>）。</li>
-            <li>リストバンドご着用で再入場が可能です。</li>
-          </ul>
-        </div>
-        <div class="card">
-          <h3>抽選</h3>
-          <ul>
-            <li>抽選券は<strong>10:00</strong>配布開始、抽選は<strong>12:00</strong>実施予定。</li>
-          </ul>
-        </div>
-        <div class="card">
-          <h3>持ち物・注意</h3>
-          <ul>
-            <li>小銭／エコバッグ／水分補給用ドリンク。</li>
-            <li>転売目的の購入は禁止です。</li>
-          </ul>
-        </div>
+    <!-- =======================================================
+         一般参加（アコーディオン）
+         ======================================================= -->
+    <details class="accordion" id="general">
+      <summary>一般参加ガイド</summary>
+      <div class="acc-body">
+        <h3>入場・再入場</h3>
+        <ul>
+          <li>入場：リストバンドを提示してください。</li>
+          <li>再入場：当日限り可（リストバンド確認）。</li>
+        </ul>
+        <h3>年齢確認</h3>
+        <p>R-18 頒布物の閲覧・購入には顔写真付き身分証が必要です。</p>
+        <h3>抽選</h3>
+        <p>抽選券は先着配布。12:00 に会場中央で実施します。</p>
+        <h3>持ち物・注意</h3>
+        <ul>
+          <li>現金の小分け・エコバッグ・水分補給を推奨。</li>
+          <li>撮影はサークルの許可がある場合のみ。</li>
+        </ul>
       </div>
-    </div>
-  </section>
+    </details>
 
-  <!-- ========== サークル参加 ========== -->
-  <section id="circle" aria-labelledby="circle-title">
-    <div class="container">
-      <h2 id="circle-title">サークル参加ガイド</h2>
-      <div class="cards">
-        <div class="card">
-          <h3>参加資格</h3>
-          <p class="muted">オリジナル／二次創作の頒布が可能な個人・団体。</p>
-        </div>
-        <div class="card">
-          <h3>ブース・料金</h3>
-          <ul>
-            <li>1ブース：<strong>5,000円</strong>（机1・椅子2・入場証2名）</li>
-            <li>追加椅子：<strong>1脚 500円</strong></li>
-          </ul>
-        </div>
-        <div class="card">
-          <h3>当日フロー</h3>
-          <ol>
-            <li>搬入：<strong>8:30</strong>〜</li>
-            <li>見本誌提出・表記確認</li>
-            <li>撤収：<strong>16:00</strong>〜</li>
-          </ol>
-        </div>
-        <div class="card">
-          <h3>見本誌・表記</h3>
-          <p class="muted">年齢区分・表紙表記・注意書きの明記にご協力ください。</p>
-        </div>
+    <!-- =======================================================
+         サークル参加（アコーディオン）
+         ======================================================= -->
+    <details class="accordion" id="circle">
+      <summary>サークル参加ガイド</summary>
+      <div class="acc-body">
+        <h3>参加資格・費用</h3>
+        <ul>
+          <li>同人誌/イラスト/グッズ等の頒布を行う個人・団体。</li>
+          <li>ブース：1ブース 5,000円（机半分/椅子1脚）</li>
+        </ul>
+        <h3>当日フロー</h3>
+        <ol>
+          <li>09:00〜 搬入・設営</li>
+          <li>09:30〜 見本誌確認</li>
+          <li>16:00〜 撤収</li>
+        </ol>
+        <h3>表記・見本誌</h3>
+        <p>年齢区分・警告ラベル・価格表示を明確に記載してください。</p>
       </div>
-    </div>
-  </section>
+    </details>
 
-  <!-- ========== サークル一覧（検索 + 50音） ========== -->
-  <section id="catalog" aria-labelledby="catalog-title">
-    <div class="container">
-      <h2 id="catalog-title">サークル一覧</h2>
-      <div class="finder" role="region" aria-label="サークル検索">
-        <div class="row">
-          <label for="query" class="hint">キーワード検索（サークル名 / PN / スペース番号 / SNS）</label>
-          <input id="query" class="searchbox" type="search" placeholder="例）ねこ / A-12 / @sample" inputmode="search" />
+    <!-- =======================================================
+         サークル一覧（アコーディオン）
+         - 仕様まとめ：
+           * CSV（./content/circle-list.csv）をfetchして描画
+           * 検索（部分一致）＋ 50音タブ（あ/か/…/わ）＋「企業」タブ
+           * 初期は「段階表示」：例 24件ずつ表示、「もっと見る」で追加
+           * SNS 複数対応：ヘッダが sns で始まる列（例：sns1,sns2, ...）や
+             "sns" 1列にカンマ/空白区切りでURL列挙も可
+           * kana 列に "kigyou" を入れると「企業」タブに分類
+         ======================================================= -->
+    <details class="accordion" id="circles" open>
+      <summary>サークル一覧</summary>
+      <div class="acc-body">
+
+        <!-- 操作UI -->
+        <div class="circle-tools">
+          <input id="q" type="search" placeholder="サークル名・PN・スペース番号で検索" aria-label="サークル検索（部分一致）" />
+          <span class="count" id="count">0件</span>
         </div>
-        <div class="row">
-          <div class="hint">50音で絞り込み（<strong>未選択時は一覧を表示しません</strong>）</div>
-          <div class="kana" role="toolbar" aria-label="50音選択" id="kana-toolbar">
-            <!-- JSでボタン挿入：あ か さ た な は ま や ら わ -->
-          </div>
+
+        <!-- 50音＋企業タブ -->
+        <div class="kana-tabs" role="tablist" aria-label="50音インデックス">
+          <!-- JSでボタン生成（ALL / あ / か / さ / た / な / は / ま / や / ら / わ / 企業） -->
         </div>
-        <div class="row">
-          <div class="hint">表示件数：<span id="count">0</span>件</div>
-          <div class="hint"><button id="resetBtn" class="kana" style="padding:.35rem .6rem">条件クリア</button></div>
+
+        <!-- グリッド本体 -->
+        <div class="circle-grid" id="grid" aria-live="polite" aria-busy="true">
+          <!-- JSでカードを段階的に追加 -->
         </div>
-        <div id="catalog-empty" class="empty" role="status">50音を選ぶか、検索してください。</div>
-        <div id="circle-grid" class="circle-grid" hidden></div>
+
+        <!-- もっと見る -->
+        <div class="grid-footer">
+          <button class="loadmore" id="loadmore" style="display:none;">もっと見る</button>
+        </div>
+
+        <!-- 読み込みエラー -->
+        <p id="error" class="alert" style="display:none;">
+          サークル一覧の読み込みに失敗しました。時間をおいて再読み込みしてください。
+          <br><small>（ローカルファイル直開きだと CORS 制限で失敗します。GitHub Pages など http/https 上でご確認ください）</small>
+        </p>
+
+        <!-- カードテンプレート（template要素） -->
+        <template id="card-tpl">
+          <article class="card">
+            <div class="thumb" data-thumb>
+              <!-- サムネがあれば img をJSで挿入。なければSVGのダミーを表示 -->
+              <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" fill="#e5e7eb" stroke="#d1d5db"/></svg>
+            </div>
+            <div class="meta">
+              <div class="name" data-name>サークル名</div>
+              <div class="sub" data-pn>PN</div>
+              <div class="space" data-space>スペース番号</div>
+              <div class="sns" data-sns><!-- SNSバッジを挿入 --></div>
+            </div>
+          </article>
+        </template>
       </div>
-      <p class="small muted">サムネイルは1枚まで。SNSは複数登録可（X/Instagram/Booth/自サイトなど）。</p>
-    </div>
-  </section>
+    </details>
 
-  <!-- ========== 会場内案内（配置図の文章要約） ========== -->
-  <section id="venue" aria-labelledby="venue-title">
-    <div class="container">
-      <h2 id="venue-title">会場内案内（要約）</h2>
-      <ul>
-        <li>受付：ホールA入口左手。年齢確認後、リストバンド配布。</li>
-        <li>抽選会場：ロビー奥・掲示板前。</li>
-        <li>島配置：一方通行（時計回り）。</li>
-        <li>非常口：2ヶ所（ホール左右）。</li>
-        <li>喫煙所：屋外テラス。</li>
-        <li>再入場：リストバンド提示で可。</li>
-      </ul>
-    </div>
-  </section>
-
-  <!-- ========== アクセス ========== -->
-  <section id="access" aria-labelledby="access-title">
-    <div class="container">
-      <h2 id="access-title">アクセス</h2>
-      <div class="cards">
-        <div class="card">
-          <h3>電車</h3>
-          <ul>
-            <li>〇〇駅（東口）から<strong>徒歩5分</strong></li>
-            <li>△△駅（北口）から<strong>徒歩12分</strong></li>
-          </ul>
-        </div>
-        <div class="card">
-          <h3>注意</h3>
-          <ul>
-            <li>駐車台数に限りがあります。公共交通機関をご利用ください。</li>
-          </ul>
-        </div>
+    <!-- =======================================================
+         アクセス（アコーディオン）
+         ======================================================= -->
+    <details class="accordion" id="access">
+      <summary>アクセス</summary>
+      <div class="acc-body">
+        <p>〇〇駅から徒歩5分、△△駅から徒歩8分。会場駐車場は関係者のみ利用可。</p>
+        <div class="note"><small>近隣の迷惑となる駐停車はご遠慮ください。</small></div>
       </div>
-    </div>
-  </section>
+    </details>
 
-  <!-- ========== Q&A ========== -->
-  <section id="qa" aria-labelledby="qa-title">
-    <div class="container">
-      <h2 id="qa-title">Q&A（3〜5件）</h2>
-      <details class="card"><summary><strong>入場は何時から並べますか？</strong></summary><div class="muted">スタッフ案内に従い、<strong>9:30</strong>以降に整列をお願いします。</div></details>
-      <details class="card"><summary><strong>飲食は可能ですか？</strong></summary><div class="muted">所定の休憩スペースでのみ可能です。会場内での飲食はご遠慮ください。</div></details>
-      <details class="card"><summary><strong>荷物は預けられますか？</strong></summary><div class="muted">コインロッカー（有料）をご利用ください。</div></details>
-    </div>
-  </section>
+    <!-- =======================================================
+         Q&A（アコーディオン）
+         - 3〜5項目の短いQAを推奨
+         ======================================================= -->
+    <details class="accordion" id="qa">
+      <summary>Q&amp;A</summary>
+      <div class="acc-body">
+        <dl>
+          <dt>Q. 再入場はできますか？</dt>
+          <dd>リストバンドの提示で当日中は再入場可能です。</dd>
 
-  <!-- ========== お問い合わせ ========== -->
-  <section id="contact" aria-labelledby="contact-title">
-    <div class="container">
-      <h2 id="contact-title">お問い合わせ</h2>
-      <p class="muted">バグ報告／改善要望のみ。個別返信は行いません。匿名・画像のみ（個人情報の記載は不可）。</p>
-      <p><a class="btn" href="#" id="issueLink" target="_blank" rel="noopener">GitHub Issue フォームを開く</a></p>
-      <p class="small">送信ありがとうございました。必要に応じて更新履歴に反映します。</p>
-    </div>
-  </section>
+          <dt>Q. クロークはありますか？</dt>
+          <dd>会場1Fに簡易クローク（有料）を設置予定です。</dd>
 
-  <footer role="contentinfo">
-    <div class="container small">&copy; 2025 ブースト実行委員会 / Draft on GitHub Pages</div>
-  </footer>
+          <dt>Q. お問い合わせの返答はありますか？</dt>
+          <dd>個別返信はありません。必要に応じて更新情報へ反映します。</dd>
+        </dl>
+      </div>
+    </details>
 
+    <!-- =======================================================
+         お問い合わせ（アコーディオン）
+         - GitHub Issueフォームへ遷移（target=_blank）
+         ======================================================= -->
+    <details class="accordion" id="contact">
+      <summary>お問い合わせ</summary>
+      <div class="acc-body">
+        <p>バグ報告／改善要望のみ受け付けます。個人情報は記載しないでください。</p>
+        <p><a class="btn primary" href="https://github.com/your/repo/issues/new?template=feedback.yml" target="_blank" rel="noopener">GitHub Issueフォームを開く</a></p>
+        <small>返信は個別に行いません。必要に応じて「最新情報」に反映します。</small>
+      </div>
+    </details>
+
+    <footer style="margin: 32px 0 48px; text-align:center; color:var(--muted);">
+      <small>&copy; 2025 ブースト実行委員会</small>
+    </footer>
+  </main>
+
+  <!-- =========================================================
+       JS：バニラJSのみ
+       - 検索/50音タブ/段階表示/CSV読込/SNSリンク生成/scrollspy
+       ========================================================= -->
   <script>
-    // ================================
-    // ユーティリティ関数
-    // ================================
-    /** 先頭のかなを行（あ/か/さ…）に正規化する。カタカナも許容。 */
-    function kanaInitial(str) {
-      if (!str) return null;
-      const kana = (str + "").trim().charAt(0)
-        .replace(/[Ａ-Ｚａ-ｚ０-９]/g, s => String.fromCharCode(s.charCodeAt(0) - 0xFEE0)) // 全角→半角
-        .replace(/[ァ-ン]/g, s => String.fromCharCode(s.charCodeAt(0) - 0x60)); // カタカナ→ひらがな
-      const ch = kana.charCodeAt(0);
-      const ranges = [
-        { k: "あ", start: 0x3042, list: "あいうえお" },
-        { k: "か", start: 0x304B, list: "かきくけこがぎぐげご" },
-        { k: "さ", start: 0x3055, list: "さしすせそざじずぜぞ" },
-        { k: "た", start: 0x305F, list: "たちつてとだぢづでど" },
-        { k: "な", start: 0x306A, list: "なにぬねの" },
-        { k: "は", start: 0x306F, list: "はひふへほばびぶべぼぱぴぷぺぽ" },
-        { k: "ま", start: 0x307E, list: "まみむめも" },
-        { k: "や", start: 0x3084, list: "やゆよ" },
-        { k: "ら", start: 0x3089, list: "らりるれろ" },
-        { k: "わ", start: 0x308F, list: "わをん" },
-      ];
-      for (const r of ranges) if (r.list.includes(String.fromCharCode(ch))) return r.k;
-      return "その他"; // 英数字や記号など
+  // ================= ユーティリティ =================
+
+  /** 簡易CSVパーサー（引用符・カンマ・改行を考慮）
+   *  - 引数：CSV文字列
+   *  - 戻り：{ header: string[], rows: string[][] }
+   *  - コメント：小さめのCSVを想定（GitHub PagesでのWebカタログ用途）
+   */
+  function parseCSV(text){
+    const rows = [];
+    let cur = '', row = [], quoted = false;
+    for(let i=0;i<text.length;i++){
+      const c = text[i];
+      if (quoted){
+        if (c === '"'){
+          if (text[i+1] === '"'){ cur += '"'; i++; } // エスケープされた引用符
+          else { quoted = false; }
+        } else {
+          cur += c;
+        }
+      } else {
+        if (c === '"'){ quoted = true; }
+        else if (c === ','){ row.push(cur); cur=''; }
+        else if (c === '\n'){ row.push(cur); rows.push(row); row=[]; cur=''; }
+        else if (c === '\r'){ /* Windows改行は無視 */ }
+        else { cur += c; }
+      }
     }
+    if (cur.length>0 || row.length>0) { row.push(cur); rows.push(row); }
+    const header = rows.shift() || [];
+    return { header, rows };
+  }
 
-    /** テキスト正規化（検索用・大文字小文字/全半角/カナ差異の吸収） */
-    function norm(txt){
-      if (!txt) return "";
-      const half = (txt+"")
-        .replace(/[Ａ-Ｚａ-ｚ０-９]/g, s => String.fromCharCode(s.charCodeAt(0) - 0xFEE0))
-        .toLowerCase();
-      // カタカナ→ひらがな
-      return half.replace(/[ァ-ン]/g, s => String.fromCharCode(s.charCodeAt(0) - 0x60));
+  /** テキスト正規化（検索用：全角→半角・小文字化） */
+  function normalize(s){
+    return (s || '')
+      .toString()
+      .trim()
+      .toLowerCase()
+      .replace(/[Ａ-Ｚａ-ｚ０-９]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0))
+      .replace(/\s+/g,' ');
+  }
+
+  /** ドメインに応じたアイコンSVGを返す（最小セット） */
+  function iconFor(url){
+    // コメント：アイコンはインラインSVG。外部アセット不要。
+    const u = new URL(url);
+    const h = u.hostname.toLowerCase();
+
+    const wrap = (d) => `<svg viewBox="0 0 24 24" aria-hidden="true">${d}</svg>`;
+
+    if (h.includes('twitter.com') || h.includes('x.com')){
+      return wrap(`<path d="M20 7.2c-.5.2-1 .3-1.6.4.6-.4 1-.9 1.2-1.6-.6.4-1.2.6-1.9.8A3 3 0 0 0 12 9.6c0 .2 0 .4.1.6A8.6 8.6 0 0 1 4.2 6c-.3.5-.4 1-.4 1.6 0 1 .6 2 1.6 2.6-.5 0-1-.2-1.4-.4v.1c0 1.5 1.1 2.8 2.6 3.1-.3.1-.6.1-.9.1-.2 0-.4 0-.6-.1.4 1.2 1.6 2.1 3 2.1A6.1 6.1 0 0 1 4 17.8c-1 0-1.3 0-2-.1a8.6 8.6 0 0 0 13.2-7.3 3.2 3.2 0 0 0 0-.5c.6-.4 1.1-.9 1.5-1.5Z"/>`);
     }
-
-    /** 要素生成の小ヘルパー */
-    function el(tag, props={}, children=[]) {
-      const node = document.createElement(tag);
-      Object.assign(node, props);
-      for (const child of children) node.append(child);
-      return node;
+    if (h.includes('bsky.app')){
+      return wrap(`<path d="M12 10c3.5-4.8 7.5-6.9 9.3-5 .9.8-.1 3-1.8 5 2.4-.5 4.6-.1 5.2 1.7.9 2.8-3.6 4.3-8.6 2.9.6 3.6-.4 7.1-2.1 7.1s-2.7-3.5-2.1-7.1c-5 1.4-9.5-.1-8.6-2.9.6-1.8 2.8-2.2 5.2-1.7-1.7-2-2.6-4.2-1.8-5 1.8-1.9 5.8.2 9.3 5Z"/>`);
     }
-
-    // ================================
-    // ダミーデータ（CSV失敗時のフォールバック）
-    // ================================
-    const FALLBACK_CIRCLES = [
-      { name: "ねこファクトリ", pn: "猫山", space: "A-01", kana: "ね", sns: ["https://x.com/neko", "https://instagram.com/neko"], thumb: "assets/sample1.jpg" },
-      { name: "からす堂", pn: "鳥井", space: "A-12", kana: "か", sns: ["https://x.com/karasu"], thumb: "assets/sample2.jpg" },
-      { name: "まんがラボ", pn: "田中", space: "B-07", kana: "ま", sns: ["https://booth.pm/xyz"], thumb: "assets/sample3.jpg" },
-      { name: "ワークスβ", pn: "beta", space: "C-15", kana: "わ", sns: ["https://example.com"], thumb: "assets/sample4.jpg" },
-      { name: "Others_01", pn: "Dev", space: "D-02", kana: "その他", sns: ["https://x.com/dev"], thumb: "assets/sample2.jpg" },
-    ];
-
-    const NEWS = [
-      { date: "2025/08/10", title: "ドラフト公開を開始しました（最大5件表示）。" },
-      { date: "2025/08/09", title: "サークルリストのCSV取り込みに対応しました。" },
-      { date: "2025/08/05", title: "サイト仕様 v0.1（ドラフト）を公開。" },
-    ];
-
-    const SCHEDULE = [
-      ["08:30", "サークル搬入開始"],
-      ["09:30", "一般整列開始"],
-      ["10:00", "開場（パンフ販売開始）"],
-      ["12:00", "抽選会（ロビー）"],
-      ["15:30", "頒布終了アナウンス"],
-      ["16:00", "閉場・撤収開始"],
-    ];
-
-    // ================================
-    // 初期描画（ニュース・スケジュール）
-    // ================================
-    function initNews(){
-      const wrap = document.getElementById('news-list');
-      NEWS.slice(0,5).forEach(item => {
-        const card = el('article', { className: 'card', role: 'listitem' }, [
-          el('div', { className: 'muted small', textContent: item.date }),
-          el('div', { textContent: item.title })
-        ]);
-        wrap.append(card);
-      });
+    if (h.includes('instagram.com')){
+      return wrap(`<rect x="3" y="3" width="18" height="18" rx="4"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1.5"/>`);
     }
-
-    function initSchedule(){
-      const tbody = document.getElementById('schedule-body');
-      SCHEDULE.slice(0,8).forEach(([t, c]) => {
-        const tr = el('tr', {}, [
-          el('td', { textContent: t }),
-          el('td', { textContent: c })
-        ]);
-        tbody.append(tr);
-      });
+    if (h.includes('pixiv.net')){
+      return wrap(`<path d="M6 5h9a5 5 0 1 1 0 10H9v4H6V5zm9 7a2 2 0 0 0 0-4H9v4h6z"/>`);
     }
+    if (h.includes('booth.pm')){
+      return wrap(`<path d="M3 7h18v10H3V7zm2 2v6h14V9H5z"/><path d="M4 5h16l1 2H3l1-2z"/>`);
+    }
+    if (h.includes('youtube.com') || h.includes('youtu.be')){
+      return wrap(`<path d="M22 12s0-3.4-.4-4.9c-.2-.8-.8-1.4-1.6-1.6C18.6 5 12 5 12 5s-6.6 0-8 .5c-.8.2-1.4.8-1.6 1.6C2 8.6 2 12 2 12s0 3.4.4 4.9c.2.8.8 1.4 1.6 1.6 1.4.5 8 .5 8 .5s6.6 0 8-.5c.8-.2 1.4-.8 1.6-1.6.4-1.5.4-4.9.4-4.9z"/><path d="M10 15V9l6 3-6 3z" />`);
+    }
+    if (h.includes('twitch.tv')){
+      return wrap(`<path d="M4 3h16v10l-4 4h-4l-2 2H8v-2H4V3zm3 2v9h9l2-2V5H7z"/><path d="M13 7h2v4h-2zM9 7h2v4H9z"/>`);
+    }
+    if (h.includes('threads.net')){
+      return wrap(`<path d="M12 3c5 0 9 4 9 9s-4 9-9 9-9-4-9-9 4-9 9-9zm1 5c3 0 5 1.7 5 4.2 0 2.7-2.3 4.8-5.6 4.8-2.7 0-4.6-1.5-4.7-3.6h2.2c.2 1 1.1 1.8 2.5 1.8 1.8 0 3.1-1 3.1-2.7 0-1.3-1-2.3-2.5-2.5v1.6h-1.9V8c.6-.1 1.3-.2 1.9-.2Z"/>`);
+    }
+    // 汎用（Webサイト）
+    return wrap(`<path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm0 2a8 8 0 0 1 7.7 6H12V4Zm0 16a8 8 0 0 1-7.7-6H12v6Z"/>`);
+  }
 
-    // ================================
-    // サークルCSV読込（content/circle-list.csv）
-    //   期待カラム：name,pn,space,thumb(optional),sns(optional;空白区切り)
-    //   例：ねこファクトリ,猫山,A-01,assets/sample1.jpg,https://x.com/neko https://instagram.com/neko
-    // ================================
-    async function loadCircles(){
-      try {
-        const res = await fetch('content/circle-list.csv', { cache: 'no-store' });
-        if (!res.ok) throw new Error('CSV not found');
-        const csv = await res.text();
-        const lines = csv.split(/\r?\n/).filter(Boolean);
-        const header = lines.shift();
-        const cols = header.split(',').map(s => s.trim());
-        const idx = {
-          name: cols.indexOf('name'), pn: cols.indexOf('pn'), space: cols.indexOf('space'),
-          thumb: cols.indexOf('thumb'), sns: cols.indexOf('sns')
+  // ================= サークル一覧 =================
+
+  // 50音タブのリスト（「企業」を末尾に追加）
+  const KANA_TABS = ['ALL','あ','か','さ','た','な','は','ま','や','ら','わ','企業'];
+  const PAGE_SIZE = 24;     // 段階表示の1ページ件数（調整可）
+  const CSV_PATH = './content/circle-list.csv'; // CSVの相対パス
+
+  // 状態管理
+  const state = {
+    all: [],         // 全レコード（配列の各要素はオブジェクトに整形）
+    filtered: [],    // 検索＋タブ適用後の配列
+    page: 1,         // 現在のページ（1始まり）
+    tab: 'ALL',      // 現在の50音タブ
+    q: ''            // 現在の検索クエリ
+  };
+
+  /** CSVを取得してstate.allへ格納 */
+  async function loadCircles(){
+    const grid = document.getElementById('grid');
+    const err = document.getElementById('error');
+    grid.setAttribute('aria-busy','true');
+    try{
+      const res = await fetch(CSV_PATH, { cache: 'no-store' });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const text = await res.text();
+      const { header, rows } = parseCSV(text);
+
+      // ヘッダ→インデックス
+      const idx = {};
+      header.forEach((h,i)=> idx[h.trim().toLowerCase()] = i);
+
+      // 想定カラム（柔軟に吸収）
+      // - 必須相当：name, pn, space, kana
+      // - 任意：thumb（画像パス相対 or URL）, sns, sns1, sns2...
+      state.all = rows.map(r => {
+        const pick = k => r[idx[k]] ?? '';
+        const obj = {
+          name: pick('name') || pick('circle') || '',
+          pn: pick('pn') || pick('penname') || '',
+          space: pick('space') || pick('space_no') || '',
+          kana: (pick('kana') || '').toLowerCase(),  // 'kigyou' で企業タブ
+          thumb: pick('thumb') || '',
+          // SNS：ヘッダが "sns" で始まる列をすべて集約（空は除外）
+          sns: []
         };
-        const rows = lines.map(line => {
-          // カンマを単純分割（ダブルクォート込みCSVに未対応：GitHub Pagesの想定簡易仕様）
-          const a = line.split(',');
-          const name = (a[idx.name]||'').trim();
-          const pn   = (a[idx.pn]||'').trim();
-          const space= (a[idx.space]||'').trim();
-          const thumb= (a[idx.thumb]||'').trim();
-          const sns  = (a[idx.sns]||'').trim();
-          return {
-            name, pn, space,
-            kana: kanaInitial(name),
-            thumb: thumb || '',
-            sns: sns ? sns.split(/\s+/) : []
-          };
+
+        // "sns" 1列に複数URLのケース（カンマ/空白/パイプ区切りを許容）
+        const s0 = pick('sns');
+        if (s0){
+          s0.split(/[\s,|]+/).forEach(u => u && obj.sns.push(u));
+        }
+        // sns1, sns2, snsX ...
+        Object.keys(idx).forEach(key=>{
+          if (key.startsWith('sns') && key !== 'sns'){
+            const v = pick(key);
+            if (v) obj.sns.push(v);
+          }
         });
-        if (!rows.length) throw new Error('empty');
-        return rows;
-      } catch (e){
-        console.warn('[catalog] CSV読込に失敗したためフォールバックを使用:', e.message);
-        return FALLBACK_CIRCLES.map(c => ({...c, kana: c.kana || kanaInitial(c.name)}));
-      }
-    }
 
-    // ================================
-    // サークル一覧UI
-    //   - 初期状態：非表示（50音or検索で表示）
-    //   - 長いスクロールを回避
-    // ================================
-    const KANA_KEYS = ["あ","か","さ","た","な","は","ま","や","ら","わ","その他"];
+        // 互換：website/url列もあればSNSに含める
+        const w = pick('website') || pick('url');
+        if (w) obj.sns.push(w);
 
-    function buildKanaToolbar(){
-      const bar = document.getElementById('kana-toolbar');
-      KANA_KEYS.forEach(k => {
-        const b = el('button', { type: 'button', textContent: k, 'aria-pressed': 'false' });
-        b.addEventListener('click', () => selectKana(k, b));
-        bar.append(b);
+        return obj;
       });
+
+      // 初期描画
+      applyFilters();
+    }catch(e){
+      console.error(e);
+      err.style.display = 'block';
+    }finally{
+      grid.removeAttribute('aria-busy');
     }
+  }
 
-    let ALL_CIRCLES = [];
-    let state = { kana: null, q: '' };
-
-    function selectKana(k, btn){
-      state.kana = (state.kana === k) ? null : k; // 同じボタンでトグル解除
-      // ボタンの aria-pressed 更新
-      document.querySelectorAll('#kana-toolbar button').forEach(b => b.setAttribute('aria-pressed', String(b === btn && state.kana)));
-      renderCircles();
-    }
-
-    function matches(c, st){
-      const okKana = !st.kana || c.kana === st.kana;
-      const nq = norm(st.q);
-      const blob = norm([c.name, c.pn, c.space, ...(c.sns||[])].join(' '));
-      const okQ = !nq || blob.includes(nq);
-      return okKana && okQ;
-    }
-
-    function circleCard(c){
-      const wrap = el('article', { className: 'circle-card' });
-      const img = c.thumb ? el('img', { src: c.thumb, alt: `${c.name} のサムネイル` }) : el('div', { className: 'circle-thumb', textContent: 'No Image' });
-      wrap.append(el('div', { className: 'circle-thumb' }, [img]));
-      const body = el('div', { className: 'circle-body' });
-      body.append(el('div', { className: 'circle-name', textContent: c.name }));
-      body.append(el('div', { className: 'circle-meta', textContent: `PN：${c.pn}　/　スペース：${c.space}` }));
-      // 区分は不要指定のため表示しない
-      const snsWrap = el('div', { className: 'sns' });
-      (c.sns||[]).forEach(u => snsWrap.append(el('a', { href: u, target: '_blank', rel: 'noopener', className: 'chip', textContent: new URL(u).hostname.replace(/^www\./,'') })));
-      body.append(snsWrap);
-      wrap.append(body);
-      return wrap;
-    }
-
-    function renderCircles(){
-      const grid = document.getElementById('circle-grid');
-      const empty = document.getElementById('catalog-empty');
-      const list = ALL_CIRCLES.filter(c => matches(c, state));
-      document.getElementById('count').textContent = list.length;
-      grid.innerHTML = '';
-      if (!state.kana && !state.q){
-        grid.hidden = true; empty.hidden = false; return;
+  /** フィルタ（検索＋50音タブ）を適用し、ページをリセット */
+  function applyFilters(){
+    const qn = normalize(state.q);
+    state.filtered = state.all.filter(item => {
+      // タブ判定
+      let tabOK = true;
+      if (state.tab && state.tab !== 'ALL'){
+        if (state.tab === '企業'){
+          tabOK = (item.kana === 'kigyou');
+        } else {
+          // 先頭の行単位（あ/か/…/わ）に属するかどうか
+          // kana 列が未設定の場合は検索のみでヒットさせる
+          const k = (item.kana || '').charAt(0);
+          tabOK = k === state.tab;
+        }
       }
-      empty.hidden = true; grid.hidden = false;
 
-      // 必要最小限のみ描画（先頭から最大 60 件などで軽量化）
-      const MAX = 60;
-      const slice = list.slice(0, MAX);
-      for (const c of slice) grid.append(circleCard(c));
-      if (list.length > MAX){
-        grid.append(el('div', { className: 'empty', textContent: `ほか ${list.length - MAX}件。条件を追加して絞り込んでください。` }));
+      // 検索（name / pn / space 部分一致）
+      const qs = qn.length ? qn : '';
+      if (!qs) return tabOK;
+
+      const hay = normalize(item.name + ' ' + item.pn + ' ' + item.space);
+      return tabOK && hay.includes(qs);
+    });
+
+    state.page = 1;
+    renderGrid();
+  }
+
+  /** グリッドへカードを段階描画 */
+  function renderGrid(){
+    const grid = document.getElementById('grid');
+    const count = document.getElementById('count');
+    const more = document.getElementById('loadmore');
+
+    grid.innerHTML = ''; // 一旦クリア
+
+    // 現在ページまでの件数
+    const limit = state.page * PAGE_SIZE;
+    const show = state.filtered.slice(0, limit);
+
+    // 件数表示
+    count.textContent = `${state.filtered.length}件${(state.tab && state.tab!=='ALL') ? '（'+state.tab+'）' : ''}`;
+
+    // カードを挿入
+    const tpl = document.getElementById('card-tpl');
+    show.forEach(it => {
+      const node = tpl.content.cloneNode(true);
+
+      // サムネ
+      const th = node.querySelector('[data-thumb]');
+      if (it.thumb){
+        const img = document.createElement('img');
+        img.loading = 'lazy';
+        img.decoding = 'async';
+        // 相対/絶対のどちらでも可（assets/circle/*.jpg など）
+        img.src = it.thumb;
+        img.alt = (it.name || 'サークル') + 'のサムネイル';
+        th.innerHTML = '';
+        th.appendChild(img);
       }
-    }
 
-    function bindFinder(){
-      const q = document.getElementById('query');
-      q.addEventListener('input', () => { state.q = q.value; renderCircles(); });
-      document.getElementById('resetBtn').addEventListener('click', () => {
-        state = { kana: null, q: '' };
-        q.value = '';
-        document.querySelectorAll('#kana-toolbar button').forEach(b => b.setAttribute('aria-pressed', 'false'));
-        renderCircles();
+      // テキスト群
+      node.querySelector('[data-name]').textContent = it.name || '（名称未設定）';
+      node.querySelector('[data-pn]').textContent = it.pn ? `PN：${it.pn}` : '';
+      node.querySelector('[data-space]').textContent = it.space ? `スペース：${it.space}` : '';
+
+      // SNSリンク
+      const snsBox = node.querySelector('[data-sns]');
+      (it.sns || []).forEach(u=>{
+        try{
+          const a = document.createElement('a');
+          a.href = u; a.target = '_blank'; a.rel = 'noopener';
+          a.innerHTML = `${iconFor(u)}<span>${new URL(u).hostname.replace(/^www\./,'')}</span>`;
+          snsBox.appendChild(a);
+        }catch(e){
+          // URLとして不正ならスキップ
+        }
       });
-    }
 
-    // ================================
-    // お問い合わせリンク（本番ではWPのカスタムフィールド等で差し替え）
-    // ================================
-    function initIssueLink(){
-      const ISSUE_URL = 'https://github.com/your/repo/issues/new/choose'; // TODO: 本番用URLに置換
-      const a = document.getElementById('issueLink');
-      a.href = ISSUE_URL;
-    }
+      grid.appendChild(node);
+    });
 
-    // ================================
-    // 起動
-    // ================================
-    (async function main(){
-      initNews();
-      initSchedule();
-      buildKanaToolbar();
-      bindFinder();
-      initIssueLink();
-      ALL_CIRCLES = await loadCircles();
-      renderCircles(); // 初回は非表示のまま（empty案内のみ）
-    })();
-  </script>
-</body>
-</html>
+    // もっと見る表示切替
+    more.style.display = (state.filtered.length > show.length) ? 'inline-flex' : 'none';
+  }
+
+  /** 「もっと見る」クリック */
+  function onLoadMore(){
+    state.page++;
+    renderGrid();
+  }
+
+  /** 50音タブ生成 */
+  function buildKanaTabs(){
+    const root = document.querySelector('.kana-tabs');
+    root.innerHTML = '';
+    KANA_TABS.forEach(k=>{
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = k;
+      if (k === state.tab) b.classList.add('is-active');
+      b.addEventListener('click', ()=>{
+        state.tab = k;
+        // 選択スタイル切替
+        root.querySelectorAll('button').forEach(x=>x.classList.remove('is-active'));
+        b.classList.add('is-active');
+        applyFilters();
+      });
+      root.appendChild(b);
+    });
+  }
+
+  // ================= ナビのscrollspy風 =================
+  function initScrollSpy(){
+    const links = Array.from(document.querySelectorAll('.topnav a'));
+    const targets = links.map(a => document.querySelector(a.getAttribute('href'))).filter(Boolean);
+
+    const io = new IntersectionObserver((entries)=>{
+      entries.forEach(e=>{
+        if (e.isIntersecting){
+          const id = '#'+e.target.id;
+          links.forEach(l => l.classList.toggle('is-active', l.getAttribute('href')===id));
+        }
+      });
+    }, { rootMargin: '-60% 0px -35% 0px', threshold: 0 });
+
+    targets.forEach(t => io.observe(t));
+  }
+
+ 
