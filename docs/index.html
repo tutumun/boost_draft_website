@@ -413,10 +413,25 @@
     // ---- SNS: URL配列→HTML生成（ドメインで種類判別）----
     function parseSNS(raw){
       if(!raw) return [];
-      // 空白/カンマ/縦棒区切りを許容。URL以外は弾く。
+      // 区切りは「空白 / カンマ / 縦棒」を許容
       const parts = raw.split(/[\s,|]+/).map(s => s.trim()).filter(Boolean);
-      const uniq = Array.from(new Set(parts));
-      return uniq.filter(u => /^https?:\/\//i.test(u));
+
+      const norm = parts.map(u => {
+        // 先頭・末尾の引用符や全角スペース・句読点を除去
+        u = u.replace(/^['"［「『（(]+|['"］」』）)。,、]+$/g, '').trim();
+
+        // スキームがない場合は https を補完（例: "pixiv.net/users/12345"）
+        if (/^\/\//.test(u)) u = 'https:' + u;        // "//example.com" → "https://example.com"
+        if (!/^https?:\/\//i.test(u) && /\./.test(u)) u = 'https://' + u;
+
+        return u;
+      });
+
+      // URLとして解釈できないものは除外
+      const uniq = Array.from(new Set(norm));
+      return uniq.filter(u => {
+        try { new URL(u); return true; } catch { return false; }
+      });
     }
     function snsKind(u){
       try{
