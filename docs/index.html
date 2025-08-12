@@ -114,16 +114,18 @@
 	.sns{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
 	.sns a{display:inline-flex;align-items:center;gap:6px;padding:6px 8px;border:1px solid var(--c-line);
 	  border-radius:999px;background:#fff;font-size:.9rem}
-	.sns .i{width:16px;height:16px;display:inline-block}
-    /* SNSボタン内のfaviconを16pxで表示（角丸で見栄えUP） */
-    .sns .fav{
-      width:16px; height:16px; border-radius:4px; object-fit:cover;
-    }
+
+    /* ▼favicon画像（CDN or 本番ローカル）*/
+    .sns .fav{width:16px;height:16px;border-radius:4px;object-fit:cover}
+
+    /* ▼SVGフォールバック（favicon失敗時用） */
+    .sns .i-fallback{display:inline-block;width:16px;height:16px;line-height:0}
+    .sns .i-fallback svg{width:16px;height:16px}
+
 	/* 先頭へ戻る */
 	.to-top{position:fixed;right:16px;bottom:16px;z-index:30;padding:10px 12px;border-radius:999px;
 	  background:#0f172a;color:#fff;opacity:.85;display:none}
 	.to-top.is-show{display:block}
-
   </style>
 </head>
 <body>
@@ -303,10 +305,6 @@
 
   <div class="footspace" aria-hidden="true"></div>
 
-  <!-- ！！重要：初期化で参照するため、#toTop をスクリプトの「前」に配置！！
-       これにより早期 return が発生せず、CSV 読込が確実に実行されます。 -->
-  <button id="toTop" class="to-top" type="button" aria-label="先頭へ戻る">▲</button>
-
   <!-- =========================================
        JS：インタラクション（スクロールスパイは簡易）
        ========================================= -->
@@ -332,6 +330,7 @@
 
   <!-- =========================================
        JS：サークル一覧 CSVロード＋検索＋50音＋企業
+       - DOMContentLoaded 後に実行して toTop ボタン生成順に依存しない
        ========================================= -->
   <script>
   /*
@@ -341,7 +340,7 @@
     - sns は複数URLを "空白/カンマ/|" 区切りで記述可
     - 区分(cat)はカード表示では非表示（仕様変更）
   */
-  (function(){
+  document.addEventListener('DOMContentLoaded', () => {
     // ---- 要素取得 ----
     const cardsWrap = document.getElementById('circle-cards');
     const q = document.getElementById('circle-q');
@@ -349,9 +348,14 @@
     const kanaBtns = Array.from(document.querySelectorAll('.kana__btn'));
     const loadmoreBtn = document.getElementById('loadmore');
     const observerEl = document.getElementById('observer');
-    const toTopBtn = document.getElementById('toTop');
-    if(!cardsWrap || !q || !hit || !loadmoreBtn || !observerEl || !toTopBtn) return; // ← ここで null だと何も動かなかった
+    const toTopBtn = document.getElementById('toTop'); // 後方にあってもOK（DOMContentLoaded後）
 
+    // 必須要素の存在チェック（toTopは任意）
+    if(!cardsWrap || !q || !hit || !loadmoreBtn || !observerEl){
+      console.warn('必要なDOMが見つからず、サークル一覧をスキップしました。');
+      return;
+    }
+  
     // ---- 正規化ユーティリティ ----
     const toHira = (str) => {
       if(!str) return '';
@@ -379,7 +383,7 @@
       }
       return 'other';
     };
-
+  
     // ---- CSV パーサ ----
     function parseCSV(text){
       const rows = [];
@@ -414,27 +418,64 @@
     }
 
     // ========================
-    // SNSリンク: URL配列の正規化
-    //  - スキームなしURLを https 化
-    //  - 重複を排除
+    // SNS: URL配列の正規化（スキーム補完/重複排除）
+    //  - "pixiv.net/..." → "https://pixiv.net/..."
+    //  - "//example.com" → "https://example.com"
     // ========================
     function parseSNS(raw){
       if(!raw) return [];
       const parts = String(raw).split(/[\s,|]+/).map(s => s.trim()).filter(Boolean);
-
       const norm = parts.map(u => {
-        // 前後の引用符や句読点を除去（CSVゆれ対策）
-        u = u.replace(/^['"［「『（(]+|['"］」』）)。,、]+$/g, '').trim();
-        // "//example.com" → "https://example.com"
+        u = u.replace(/^['"［「『（(]+|['"］」』）)。,、]+$/g, '').trim(); // 引用符など除去
         if (/^\/\//.test(u)) u = 'https:' + u;
-        // "pixiv.net/..." → "https://pixiv.net/..."
         if (!/^https?:\/\//i.test(u) && /\./.test(u)) u = 'https://' + u;
         return u;
       });
-
-      // URLとして解釈できるものだけ残す
       const uniq = Array.from(new Set(norm));
       return uniq.filter(u => { try{ new URL(u); return true; } catch{ return false; } });
+    }
+
+    // ========================
+    // SNSの種類判定（既存ロジック）
+    // ========================
+    function snsKind(u){
+      try{
+        const h = new URL(u).hostname.replace(/^www\./, '');
+        if (/(x\.com|twitter\.com)$/i.test(h)) return 'x';
+        if (/pixiv\.net$/i.test(h) || /pixiv\.me$/i.test(h)) return 'pixiv';
+        if (/booth\.pm$/i.test(h)) return 'booth';
+        if (/instagram\.com$/i.test(h)) return 'ig';
+        if (/bsky\.app$/i.test(h)) return 'bsky';
+        if (/youtube\.com$|youtu\.be$/i.test(h)) return 'yt';
+        return 'web';
+      }catch{ return 'web'; }
+    }
+    function snsLabel(kind){
+      return {x:'X', pixiv:'Pixiv', booth:'Booth', ig:'Instagram', bsky:'Bluesky', yt:'YouTube', web:'Web'}[kind] || 'Web';
+    }
+
+    // ========================
+    // SVGフォールバック（CDN失敗時に表示）
+    // ========================
+    function snsIcon(kind){
+      const svg = (paths) =>
+        `<svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false">${paths}</svg>`;
+      switch(kind){
+        case 'x':
+          return svg(`<path fill="currentColor" d="M3 3h4.3l5 7.2L17.5 3H21l-7.4 10.6L21 21h-4.3L11 13.7 6.5 21H3l7.6-10.9L3 3z"/>`);
+        case 'pixiv':
+          return svg(`<circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M9 8h5a3 3 0 1 1 0 6h-2v3H9z" fill="currentColor"/>`);
+        case 'booth':
+          return svg(`<rect x="3" y="7" width="18" height="10" rx="2" ry="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M5 11h14" stroke="currentColor" stroke-width="2"/>`);
+        case 'ig':
+          return svg(`<rect x="4" y="4" width="16" height="16" rx="4" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="17" cy="7" r="1.5" fill="currentColor"/>`);
+        case 'bsky':
+          return svg(`<path fill="currentColor" d="M12 10c2-4 8-6 10 0-3 1-6 3-10 9-4-6-7-8-10-9 2-6 8-4 10 0z"/>`);
+        case 'yt':
+          return svg(`<path d="M22 12c0-3-1-5-1-5s-1-2-4-2H7C4 5 3 7 3 7s-1 2-1 5 1 5 1 5 1 2 4 2h10c3 0 4-2 4-2s1-2 1-5z" fill="currentColor"/><path d="M10 9v6l5-3-5-3z" fill="#fff"/>`);
+        default:
+          return svg(`<circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/>`);
+      }
     }
 
     // ========================
@@ -464,83 +505,41 @@
     }
 
     // ========================
-    // SNSリンクHTML生成：favicon画像 + ラベル
-    //  - faviconはCDNから取得、失敗時は非表示（ラベルのみ）
-    //  - 参照元を送らないために no-referrer を付与
+    // SNSリンクHTML生成：favicon優先 + SVGフォールバック
+    //  - faviconが読めたらSVGを隠す（onload）
+    //  - 失敗時は<img>を消し、SVGだけ残す（onerror）
     // ========================
     function buildSNSHtml(urls){
       if(!urls.length) return '';
       const items = urls.map(u => {
         const host = hostFromUrl(u);
         const fav  = host ? faviconURL(host, 32) : '';
-        const label= (function(){
-          // 既存の snsKind/snsLabel を活用（無ければ "Web"）
-          try{
-            const k = snsKind(u);
-            return (snsLabel && snsLabel(k)) || 'Web';
-          }catch{ return 'Web'; }
-        })();
+        const kind = (()=>{ try{ return snsKind(u); }catch{ return 'web'; } })();
+        const label= (()=>{ try{ return snsLabel(kind) || 'Web'; }catch{ return 'Web'; } })();
 
+        const fallbackSvg = `<span class="i-fallback" aria-hidden="true">${snsIcon(kind)}</span>`;
         const favImg = fav
           ? `<img class="fav" src="${fav}" loading="lazy" decoding="async"
                    referrerpolicy="no-referrer" alt="" aria-hidden="true"
+                   onload="this.previousElementSibling.style.display='none'"
                    onerror="this.style.display='none'">`
           : '';
 
         return `<a href="${escapeHTML(u)}" target="_blank" rel="noopener" aria-label="${label}へ">
-                  ${favImg}<span>${label}</span>
+                  ${fallbackSvg}${favImg}<span>${label}</span>
                 </a>`;
       }).join('');
 
       return `<div class="sns" aria-label="SNSリンク">${items}</div>`;
     }
-
-    function snsKind(u){
-      try{
-        const h = new URL(u).hostname.replace(/^www\./, '');
-        if (/(x\.com|twitter\.com)$/i.test(h)) return 'x';
-        if (/pixiv\.net$/i.test(h)) return 'pixiv';
-        if (/booth\.pm$/i.test(h)) return 'booth';
-        if (/instagram\.com$/i.test(h)) return 'ig';
-        if (/bsky\.app$/i.test(h)) return 'bsky';
-        if (/youtube\.com$|youtu\.be$/i.test(h)) return 'yt';
-        return 'web';
-      }catch{ return 'web'; }
-    }
-    function snsIcon(kind){
-      // 小型のインラインSVG（外部依存なし）
-      const map = {
-        x: '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3h4.3l5 7.2L17.5 3H21l-7.4 10.6L21 21h-4.3L11 13.7 6.5 21H3l7.6-10.9L3 3z"/></svg>',
-        pixiv: '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/></svg>',
-        booth: '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="18" height="12" rx="2"/></svg>',
-        ig: '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="4"/><circle cx="12" cy="12" r="4"/><circle cx="17" cy="7" r="1"/></svg>',
-        bsky: '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 10c2-4 8-6 10 0-3 1-6 3-10 9-4-6-7-8-10-9 2-6 8-4 10 0z"/></svg>',
-        yt: '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 12c0-3-1-5-1-5s-1-2-4-2H7C4 5 3 7 3 7s-1 2-1 5 1 5 1 5 1 2 4 2h10c3 0 4-2 4-2s1-2 1-5z"/><path d="M10 9v6l5-3-5-3z" fill="#fff"/></svg>',
-        web: '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 4 3 14 0 18M7 5c2 3 2 11 0 14M17 5c-2 3-2 11 0 14"/></svg>'
-      };
-      return map[kind] || map.web;
-    }
-    function snsLabel(kind){
-      return {x:'X', pixiv:'Pixiv', booth:'Booth', ig:'Instagram', bsky:'Bluesky', yt:'YouTube', web:'Web'}[kind] || 'Web';
-    }
-    function buildSNSHtml(urls){
-      if(!urls.length) return '';
-      const items = urls.map(u => {
-        const k = snsKind(u);
-        return `<a href="${escapeHTML(u)}" target="_blank" rel="noopener" aria-label="${snsLabel(k)}へ">
-          ${snsIcon(k)}<span>${snsLabel(k)}</span>
-        </a>`;
-      }).join('');
-      return `<div class="sns" aria-label="SNSリンク">${items}</div>`;
-    }
-
+  
     // ---- 状態と描画（段階表示） ----
     let allCards = [];            // 生成された <article> 要素の配列（全件）
     let filtered = [];            // フィルタ適用後の配列
     const PAGE_SIZE = 24;         // 初期/追加の表示件数
     let visibleCount = PAGE_SIZE; // 現在の表示上限
     let state = { text:'', row:'all' };
-
+  
     function matchText(card, needle){
       if(!needle) return true;
       const target = [card.dataset.name, card.dataset.pn, card.dataset.space].map(toHira).join('|');
@@ -551,13 +550,11 @@
       return (card.dataset.kana || 'other') === row; // 'kigyou' もここで判定
     }
     function applyFilter(){
-      // フィルタを適用し、表示上限を初期化
       filtered = allCards.filter(c => matchText(c, state.text) && matchRow(c, state.row));
       visibleCount = PAGE_SIZE;
       render();
     }
     function render(){
-      // 一旦すべて非表示 → 先頭 visibleCount 件だけ表示
       let count = 0;
       for(const c of allCards){ c.style.display = 'none'; }
       for(let i=0; i<filtered.length && i<visibleCount; i++){
@@ -565,16 +562,13 @@
         count++;
       }
       hit.textContent = String(filtered.length);
-      // さらに表示ボタンの活性/非活性
-      const more = filtered.length > visibleCount;
-      loadmoreBtn.disabled = !more;
+      loadmoreBtn.disabled = !(filtered.length > visibleCount);
     }
     function showMore(){
-      // 表示上限を加算して再描画
       visibleCount += PAGE_SIZE;
       render();
     }
-
+  
     // ---- イベント：検索・50音・上へ戻る ----
     let timer = 0;
     q.addEventListener('input', (e) => {
@@ -597,13 +591,15 @@
         applyFilter();
       });
     });
-
-    // 上へ戻る
-    toTopBtn.addEventListener('click', () => window.scrollTo({top:0, behavior:'smooth'}));
-    window.addEventListener('scroll', () => {
-      toTopBtn.classList.toggle('is-show', window.scrollY > 600);
-    }, {passive:true});
-
+  
+    // 上へ戻る（ボタンが存在する場合のみ有効化）
+    if(toTopBtn){
+      toTopBtn.addEventListener('click', () => window.scrollTo({top:0, behavior:'smooth'}));
+      window.addEventListener('scroll', () => {
+        toTopBtn.classList.toggle('is-show', window.scrollY > 600);
+      }, {passive:true});
+    }
+  
     // ---- URLハッシュ同期（共有用） ----
     const applyHash = () => {
       const hash = new URLSearchParams(location.hash.replace(/^#/, ''));
@@ -623,19 +619,19 @@
       }
     };
     window.addEventListener('hashchange', applyHash);
-
+  
     // ---- データロード＆カード生成 ----
     async function loadAndRender(){
       try{
         const res = await fetch(`./content/circle-list.csv?ts=${Date.now()}`);
         if(!res.ok) throw new Error('CSVの読み込みに失敗: ' + res.status);
         let text = await res.text();
-        text = text.replace(/^\uFEFF/, '');
+        text = text.replace(/^\uFEFF/, ''); // BOM除去
         const items = csvToObjects(text);
-
+  
         cardsWrap.innerHTML = '';
         allCards.length = 0;
-
+  
         for(const it of items){
           const name  = it.name || '';
           const pn    = it.pn || '';
@@ -643,28 +639,31 @@
           const cat   = it.cat || '';
           const thumb = it.thumb || '';
           const desc  = it.desc || '';
-          const snsRaw= it.sns || ''; // ← 複数URL対応
-          const sns   = parseSNS(snsRaw);
-
+          const snsRaw= it.sns || '';
+          const sns   = parseSNS(snsRaw); // ← 複数URL対応 + スキーム補完
+  
           // kana 決定（kigyou 明示 or 自動）
           let kana = (it.kana || '').toLowerCase();
           if(!kana){
             if(space.includes('企業') || cat.includes('企業')) kana = 'kigyou';
             else kana = kanaRowKey(name || pn);
           }
-
+  
           const art = document.createElement('article');
           art.className = 'card card--circle';
           art.dataset.name = name;
           art.dataset.pn = pn;
           art.dataset.space = space;
           art.dataset.kana = kana;
-
-          // カード本体（区分は表示しない）
+  
           const thumbHtml = thumb ? 
             `<img class="circle__thumb" src="${escapeHTML(thumb)}" alt="${escapeHTML(name)} のサムネイル" />` : '';
           const rowStart = thumb ? `<div class="circle__row">${thumbHtml}<div>` : `<div>`;
           const rowEnd   = thumb ? `</div></div>` : `</div>`;
+
+          // ▼SNS（favicon優先 + SVGフォールバック）
+          const snsHtml = buildSNSHtml(sns);
+
           art.innerHTML = `
             ${rowStart}
               <div class="circle__head">
@@ -672,29 +671,29 @@
                 <div class="circle__meta">PN：${escapeHTML(pn)}</div>
               </div>
               <div class="circle__body">${escapeHTML(desc)}</div>
-              ${buildSNSHtml(sns)}
+              ${snsHtml}
             ${rowEnd}
           `;
           cardsWrap.appendChild(art);
           allCards.push(art);
         }
-
+  
         // 初期状態
         setKanaPressed('all');
         state.text = '';
         state.row  = 'all';
         applyFilter();      // ← filtered を作って render
-
+  
       }catch(err){
         console.error(err);
         cardsWrap.innerHTML = `<p class="note">サークル一覧の読み込みに失敗しました。時間をおいて再読み込みしてください。</p>`;
         hit.textContent = '0';
       }
     }
-
+  
     // ---- さらに表示（手動） ----
     loadmoreBtn.addEventListener('click', showMore);
-
+  
     // ---- 無限読み足し（画面下に来たら自動で showMore）----
     const io = new IntersectionObserver((entries) => {
       const ent = entries[0];
@@ -705,10 +704,13 @@
       }
     }, {root:null, threshold:1.0});
     io.observe(observerEl);
-
+  
     // ---- 初期ロード ----
     loadAndRender().then(applyHash);
-  })();
+  });
   </script>
+
+  <!-- 先頭へ戻る（フローティング） -->
+  <button id="toTop" class="to-top" type="button" aria-label="先頭へ戻る">▲</button>
 </body>
 </html>
