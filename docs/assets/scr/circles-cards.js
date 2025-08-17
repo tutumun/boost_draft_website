@@ -6,36 +6,16 @@
 (() => {
   "use strict";
 
-  /**
-   * CSV を読み込んで配列データ化します。
-   * 期待カラム（ヘッダー無し）：
-   *   0: サークル名 (name)
-   *   1: PN          (pn)
-   *   2: スペース    (space)
-   *   3: 区分        (type)
-   * 以降は任意（存在すれば利用）：
-   *   4: サークルカット画像パス (cut) 例: assets/img/circles/alpha.jpg
-   *   5: X/Twitter URL
-   *   6: pixiv URL
-   *   7: BOOTH URL
-   *   8: Web/Blog URL
-   *   9: Instagram URL
-   *  10: Bluesky URL
-   *  11: Tumblr URL
-   * …不足していても可（存在する分だけアイコン表示）。
-   */
   async function loadCircles() {
     try {
       const res = await fetch("content/circle-list.csv", { cache: "no-store" });
       if (!res.ok) throw new Error("CSV fetch error: " + res.status);
       const text = await res.text();
 
-      // 行ごとに分割（空行を除外）。引用やカンマを厳密に扱う必要があれば CSV パーサ導入を検討。
-  const rows = text
-    .split(/\r?\n/)
-    .map((l) => l.trim())
-    .filter((l) => l.length > 0);
-
+      const rows = text
+        .split(/\r?\n/)
+        .map((l) => l.trim())
+        .filter((l) => l.length > 0);
 
       const data = rows.map((line) => {
         const cells = line.split(",").map((s) => s.trim());
@@ -47,46 +27,22 @@
       return data;
     } catch (err) {
       console.warn("circle-list.csv の読み込みに失敗しました:", err);
-      // 失敗時は空配列を返す（UI は空表示）。必要ならデモ用データをここで返すことも可。
       return [];
     }
   }
 
-  // ========================
-  // favicon取得ポリシー
-  // ①（本番用 / コメントアウト）：WPにキャッシュしたPNGを配信
-  //    例: /wp-content/uploads/favicons/example.com.png
-  //    ※本番移行時にこの関数を有効化し、②を無効化してください。
-  // ========================
-  /*
-  function faviconURL(host){
-    // 本番：サーバー側で事前生成しておく（WP-Cronで週1更新など）
-    return `/wp-content/uploads/favicons/${host}.png`;
-  }
-  */
-
-  // ========================
-  // ②（ドラフト用 / 有効）：CDNから取得（Google S2）
-  //    相手サイトへ直接アクセスしないので負荷集中を回避
-  // ========================
   function faviconURL(host, size = 32){
     return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=${size}`;
   }
 
-  // URL → ホスト名（失敗時は null）
   function hostFromUrl(u){
     try { return new URL(u).hostname; } catch { return null; }
   }
 
-  /**
-   * カード1枚分の DOM を生成
-   * @param {{name:string,pn:string,space:string,type?:string,cut?:string,sns?:Record<string,string>}} item
-   */
   function buildCard(item) {
     const card = document.createElement("div");
     card.className = "card";
 
-    // 左：サークルカット（任意）
     if (item.cut) {
       const img = document.createElement("img");
       img.className = "cut";
@@ -95,15 +51,13 @@
       img.src = item.cut;
       card.appendChild(img);
     } else {
-      // カットが未指定なら、見た目を崩さないよう空のプレースホルダーを挿入
       const ph = document.createElement("div");
       ph.className = "cut";
       card.appendChild(ph);
     }
 
-    // 右：情報ブロック
     const info = document.createElement("div");
-    info.className = "info"; // CSS 側で縦積みスタイル
+    info.className = "info";
 
     const nm = document.createElement("div");
     nm.className = "name";
@@ -120,31 +74,30 @@
     pn.textContent = item.pn || "";
     info.appendChild(pn);
 
-    // SNS リンク群（存在するものだけ表示）
     const snsWrap = document.createElement("div");
     snsWrap.className = "sns";
     const sns = item.sns || {};
 
-    (Object.keys(sns)).forEach((key) => {
+    Object.keys(sns).forEach((key) => {
       const url = (sns[key] || "").trim();
-      if (!url) return; // 空はスキップ
+      if (!url) return;
 
       const a = document.createElement("a");
       a.href = url; a.target = "_blank"; a.rel = "noopener";
 
-      // --- ここで favicon を取得して表示（Google S2） ---
       const host = hostFromUrl(url);
       if (host) {
         const img = document.createElement("img");
         img.className = "favicon";
-        img.alt = "";
+        img.alt = key;
         img.loading = "lazy";
         img.width = 18; img.height = 18;
         img.src = faviconURL(host, 32);
         a.appendChild(img);
+      } else {
+        // fallback: テキストリンク
+        a.appendChild(document.createTextNode(key));
       }
-      // アクセシビリティのため、サービス名テキストも入れておく
-      a.appendChild(document.createTextNode(key));
       snsWrap.appendChild(a);
     });
 
@@ -154,10 +107,6 @@
     return card;
   }
 
-  /**
-   * カード描画（外部からも使えるように公開）
-   * @param {Array} data
-   */
   function renderCards(data) {
     const container = document.getElementById("circleList");
     if (!container) return;
@@ -168,10 +117,8 @@
     });
   }
 
-  // グローバル公開：circles-view.js 側の並べ替え・切替から呼ばれる想定
   window.renderCards = renderCards;
 
-  // 初期ロード：CSV→window.circleData に格納し、初期表示をカードで描画
   document.addEventListener("DOMContentLoaded", async () => {
     const data = await loadCircles();
     window.circleData = Array.isArray(data) ? data : [];
