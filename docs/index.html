@@ -31,9 +31,8 @@
   </nav>
 
   <!-- ========== ヒーロー / 開催概要（コミットの上部ブロックを反映） ========== -->
-  <header id="hero">
-    <!-- 画像はコミットでは「イベントフライヤー（イメージ）」の表記。必要時に <img ...> を差し込む想定 -->
-    <!-- <img src="assets/img/flyer.jpg" alt="イベントフライヤー（イメージ）"> -->
+  <header id="hero">    <!-- フライヤー画像：コミット版の「イベントフライヤー（イメージ）」を実表示（画像は assets/img/flyer.jpg を想定。必要に応じて差し替え） -->
+    <img src="assets/img/flyers/flyer-placeholder.png" alt="イベントフライヤー（イメージ）" style="max-width:100%;height:auto;" />
 
     <h1>ブースト！</h1>
 
@@ -182,6 +181,16 @@
 
   <!-- ========== 分割済みJSの読み込み ========== -->
   <script src="assets/scr/circles-cards.js"></script>
-  <script src="assets/scr/circles-view.js"></script>
+  $1
+  
+  <!-- 初期表示：カード表示をデフォルトにする（データが0件でも「表」ではなく「カード」モードで初期化） -->
+  <script>
+    // DOM 構築後にカード表示ボタンを自動押下
+    // ※ サークルデータ（content/circle-list.csv）が未配置でも表示モードだけはカードになります
+    document.addEventListener('DOMContentLoaded', () => {
+      const btn = document.getElementById('viewCards');
+      if (btn) btn.click();
+    });
+  </script>
 </body>
 </html>
