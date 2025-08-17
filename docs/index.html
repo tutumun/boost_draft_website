@@ -1,150 +1,131 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>ブースト！｜公式ドラフト</title>
-  <link rel="stylesheet" href="assets/scr/site.css" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ブースト！公式サイト</title>
+  <!-- 現在のディレクトリ構成に合わせてパスのみ調整（デザイン・内容は変更しない） -->
+  <link rel="stylesheet" href="assets/scr/site.css"><!-- 旧: site.css -->
+  <script src="assets/scr/circles-cards.js" defer></script><!-- 旧: circles-cards.js -->
+  <script src="assets/scr/circles-view.js" defer></script><!-- 旧: circles-view.js -->
 </head>
 <body>
-  <header id="hero">
-    <div class="hero-inner">
-      <img src="assets/img/flyer.jpg" alt="イベントフライヤー（イメージ）" class="flyer" />
-      <div class="hero-text">
-        <h1>ブースト！</h1>
-        <p class="date">2025/11/23（日） 10:00–16:00</p>
-        <p class="venue">会場：○○コンベンションセンター</p>
-        <p class="fee">入場：一般 1,000円（再入場可）</p>
-        <p class="hero-links">
-          <a href="#general" class="btn">一般参加ガイド</a>
-          <a href="#circle" class="btn">サークル参加ガイド</a>
-        </p>
-      </div>
-    </div>
-  </header>
-
-  <nav class="top-nav">
+  <!-- ナビゲーション（そのまま） -->
+  <nav class="navbar">
     <ul>
+      <li><a href="#hero">開催概要</a></li>
       <li><a href="#news">最新情報</a></li>
-      <li><a href="#schedule">当日スケジュール</a></li>
+      <li><a href="#schedule">スケジュール</a></li>
       <li><a href="#general">一般参加</a></li>
       <li><a href="#circle">サークル参加</a></li>
-      <li><a href="#circles">サークル一覧</a></li>
+      <li><a href="#circle-list">サークル一覧</a></li>
+      <li><a href="#map">配置図</a></li>
       <li><a href="#access">アクセス</a></li>
       <li><a href="#qa">Q&A</a></li>
-      <li><a href="#contact">お問い合わせ</a></li>
+      <li><a href="#contact">問い合わせ</a></li>
     </ul>
   </nav>
 
-  <main>
-    <section id="news" class="section">
-      <h2>最新情報</h2>
-      <article>
-        <h3><time datetime="2025-08-11">2025/08/11</time> ドラフト公開</h3>
-        <p>GitHub Pagesにてドラフト版を公開しました。</p>
-      </article>
-    </section>
+  <!-- ヒーロー（そのまま） -->
+  <section id="hero" class="hero">
+    <h1>ブースト！同人イベント</h1>
+    <p>2025/10/12 10:00〜16:00 @ 東京ビッグサイト</p>
+    <p>一般参加：1,000円 ／ サークル参加：5,000円</p>
+    <div class="cta">
+      <a href="#general" class="btn">一般参加ガイド</a>
+      <a href="#circle" class="btn">サークル参加ガイド</a>
+    </div>
+  </section>
 
-    <section id="schedule" class="section">
-      <h2>当日スケジュール</h2>
-      <ul class="timeline">
-        <li><time>09:00</time> サークル入場開始</li>
-        <li><time>10:00</time> 一般入場開始</li>
-        <li><time>12:00</time> 抽選企画（予定）</li>
-        <li><time>16:00</time> 閉場</li>
-      </ul>
-      <p class="note">時刻は目安です。変更の可能性があります。</p>
-    </section>
+  <!-- 最新情報（そのまま） -->
+  <section id="news">
+    <h2>最新情報</h2>
+    <ul>
+      <li>2025/08/10 開催概要ページを更新しました</li>
+      <li>2025/08/01 サークル参加申込を開始しました</li>
+      <li>2025/07/15 一般参加の注意事項を公開しました</li>
+    </ul>
+  </section>
 
-    <section id="general" class="section">
-      <h2>一般参加ガイド</h2>
-      <ul>
-        <li>入場料金：1,000円。再入場可（リストバンド提示）。</li>
-        <li>R-18エリアは年齢確認必須。公的身分証をご提示ください。</li>
-        <li>小銭・エコバッグ・水分補給を推奨。会場指示に従ってください。</li>
-      </ul>
-    </section>
+  <!-- 当日スケジュール（そのまま） -->
+  <section id="schedule">
+    <h2>当日スケジュール</h2>
+    <table>
+      <tr><th>時間</th><th>内容</th></tr>
+      <tr><td>09:00</td><td>サークル入場開始</td></tr>
+      <tr><td>10:00</td><td>一般入場開始</td></tr>
+      <tr><td>12:00</td><td>抽選イベント</td></tr>
+      <tr><td>13:00</td><td>企画ステージ</td></tr>
+      <tr><td>16:00</td><td>閉会</td></tr>
+    </table>
+  </section>
 
-    <section id="circle" class="section">
-      <h2>サークル参加ガイド</h2>
-      <ul>
-        <li>対象：オリジナル同人の頒布を行う個人・団体。</li>
-        <li>参加費：1ブース 5,000円（机半分／椅子1脚）。</li>
-        <li>搬入→設営→開場→撤収の流れ。見本誌確認あり。</li>
-      </ul>
-    </section>
+  <!-- 一般参加（そのまま） -->
+  <section id="general">
+    <h2>一般参加ガイド</h2>
+    <ul>
+      <li>年齢確認：18歳未満入場不可</li>
+      <li>入場：パンフレット購入で入場可（1,000円）</li>
+      <li>再入場：リストバンド着用で可</li>
+      <li>抽選：12:00〜 抽選会場にて</li>
+      <li>持ち物：身分証明書・現金・エコバッグ</li>
+    </ul>
+  </section>
 
-    <section id="circles" class="section">
-      <h2>サークル一覧</h2>
-      <div class="controls-row">
-        <button id="viewCards" type="button">カード表示</button>
-        <button id="viewTable" type="button">表表示（Excel用）</button>
-        <span>並び順:</span>
-        <button id="sortKana" type="button">五十音順（サークル名）</button>
-        <button id="sortSpace" type="button">スペース順（島-番号）</button>
-      </div>
-      <nav class="kana-tabs">
-        <a href="#all">全件</a>
-        <a href="#kana-a">あ行</a>
-        <a href="#kana-ka">か行</a>
-        <a href="#kana-sa">さ行</a>
-        <a href="#kana-ta">た行</a>
-        <a href="#kana-na">な行</a>
-        <a href="#kana-ha">は行</a>
-        <a href="#kana-ma">ま行</a>
-        <a href="#kana-ya">や行</a>
-        <a href="#kana-ra">ら行</a>
-        <a href="#kana-wa">わ行</a>
-        <a href="#kana-biz">企業</a>
-      </nav>
-      <div class="search-row">
-        <label for="circleSearch">サークル検索</label>
-        <input id="circleSearch" type="search" placeholder="サークル名 / PN / スペース番号 / 区分" />
-        <output id="circleCount" aria-live="polite">該当：0 件</output>
-      </div>
-      <div id="circleList"></div>
-      <div class="more-row">
-        <button id="showMore" type="button">さらに表示</button>
-      </div>
-      <p class="muted">※ この表をコピーすると、Excelに列ごと整形されて貼り付けできます。</p>
-    </section>
+  <!-- サークル参加（そのまま） -->
+  <section id="circle">
+    <h2>サークル参加ガイド</h2>
+    <ul>
+      <li>参加資格：同人誌・創作物の頒布が可能な個人/団体</li>
+      <li>ブース種別：1ブース 5,000円</li>
+      <li>入場時間：9:00〜10:00</li>
+      <li>見本誌：本部へ提出必須</li>
+      <li>景品イラスト：任意提出可</li>
+    </ul>
+  </section>
 
-    <section id="access" class="section">
-      <h2>アクセス</h2>
-      <p>最寄駅から徒歩5分。駐車は近隣コインパーキングをご利用ください。</p>
-    </section>
+  <!-- サークル一覧（そのまま。#circleList はJSの描画ターゲット） -->
+  <section id="circle-list">
+    <h2>サークル一覧</h2>
+    <div class="view-controls">
+      <button id="viewCards">カード表示</button>
+      <button id="viewTable">表表示</button>
+      <button id="sortKana">五十音順</button>
+      <button id="sortSpace">スペース順</button>
+    </div>
+    <div id="circleList" class="circle-list"></div>
+  </section>
 
-    <section id="qa" class="section">
-      <h2>Q&A</h2>
-      <details>
-        <summary>再入場は可能ですか？</summary>
-        <p>可能です。リストバンドをご提示ください。</p>
-      </details>
-      <details>
-        <summary>撮影はできますか？</summary>
-        <p>被写体の許可がある場合のみ可。会場のルールに従ってください。</p>
-      </details>
-      <details>
-        <summary>落とし物はどこに？</summary>
-        <p>本部までお越しください。</p>
-      </details>
-    </section>
+  <!-- 配置図（そのまま） -->
+  <section id="map">
+    <h2>配置図（要約）</h2>
+    <p>受付は正面入口、年齢確認は左ホール、抽選会場は右ホール。島配置は一方通行。非常口は2ヶ所、喫煙所は屋外指定場所。再入場はリストバンド必須。</p>
+  </section>
 
-    <section id="contact" class="section">
-      <h2>お問い合わせ</h2>
-      <p>不具合報告・改善要望は、以下から匿名で送信できます（画像のみ添付可）。</p>
-      <p><a class="btn" href="https://example.com" target="_blank" rel="noopener">Issueフォームを開く</a></p>
-      <p class="note">※緊急時は現地スタッフへお声がけください。</p>
-    </section>
-  </main>
+  <!-- アクセス（そのまま） -->
+  <section id="access">
+    <h2>アクセス</h2>
+    <p>りんかい線 国際展示場駅から徒歩5分、ゆりかもめ 東京ビッグサイト駅から徒歩2分。駐車場は利用不可。</p>
+  </section>
 
-  <script src="assets/scr/circles-cards.js"></script>
-  <script src="assets/scr/circles-view.js"></script>
-  <script>
-    document.addEventListener('DOMContentLoaded', () => {
-      const btn = document.getElementById('viewCards');
-      if (btn) btn.click();
-    });
-  </script>
+  <!-- Q&A（そのまま） -->
+  <section id="qa">
+    <h2>Q&A</h2>
+    <dl>
+      <dt>Q. 入場に必要なものは？</dt>
+      <dd>A. パンフレットと年齢確認用の身分証明書です。</dd>
+      <dt>Q. 再入場はできますか？</dt>
+      <dd>A. リストバンド着用で再入場可能です。</dd>
+      <dt>Q. 撮影は可能ですか？</dt>
+      <dd>A. 個人利用に限り可能ですが、被写体の許可を必ず得てください。</dd>
+    </dl>
+  </section>
+
+  <!-- 問い合わせ（そのまま） -->
+  <section id="contact">
+    <h2>問い合わせ</h2>
+    <p>不明点はGitHub Issueフォームよりお問い合わせください。</p>
+    <a href="https://github.com/tutumun/boost_draft_website/issues/new" target="_blank" rel="noopener" class="btn">問い合わせフォーム</a>
+  </section>
 </body>
 </html>

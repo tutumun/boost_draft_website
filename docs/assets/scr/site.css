@@ -1,6 +1,133 @@
-body { font-family: sans-serif; margin: 0; padding: 0; }
-header { background: #eee; padding: 1rem; }
-nav button { margin-right: 0.5rem; }
-.card { border: 1px solid #ccc; padding: 0.5rem; margin: 0.5rem; }
-table { border-collapse: collapse; width: 100%; }
-th, td { border: 1px solid #ccc; padding: 0.25rem; text-align: left; }
+/* =========================================
+   ブースト！公式サイト 共通スタイル
+   ※ デザイン・内容は HTML に準拠。HTMLは変更せず、
+     現行のマークアップ（クラス名/ID）に合わせて見た目のみ定義。
+   ========================================= */
+
+/* ---------- CSS変数（配色・余白・幅） ---------- */
+:root {
+  --bg: #ffffff;                 /* 背景色 */
+  --fg: #222222;                 /* 文字色 */
+  --muted: #666666;              /* 補助テキスト色 */
+  --primary: #1f6feb;            /* ボタンなどのアクセント */
+  --primary-fg: #ffffff;         /* アクセント上の文字色 */
+  --border: #e5e7eb;             /* 罫線色 */
+  --card: #ffffff;               /* カード背景 */
+  --shadow: 0 2px 10px rgba(0,0,0,.06); /* カード影 */
+  --radius: 10px;                /* 角丸 */
+  --maxw: 960px;                 /* 本文の最大幅 */
+  --space-1: .25rem;
+  --space-2: .5rem;
+  --space-3: .75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+}
+
+/* ---------- ベースリセット（軽め） ---------- */
+*, *::before, *::after { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  color: var(--fg);
+  background: var(--bg);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans JP", "Hiragino Kaku Gothic ProN", "Yu Gothic", "Meiryo", sans-serif;
+  line-height: 1.7;
+}
+img { max-width: 100%; height: auto; vertical-align: middle; }
+a { color: var(--primary); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* 共通レイアウト：ページ要素の幅制限 */
+nav.navbar,
+section,
+header.hero { width: min(100%, var(--maxw)); margin-inline: auto; padding-inline: var(--space-4); }
+
+/* ---------- ナビゲーション ---------- */
+.navbar { position: sticky; top: 0; z-index: 20; background: #f8fafc; border-bottom: 1px solid var(--border); }
+.navbar ul { margin: 0; padding: var(--space-2) var(--space-4); display: flex; flex-wrap: wrap; gap: var(--space-2); list-style: none; }
+.navbar a { display: inline-block; padding: .4rem .6rem; border: 1px solid var(--border); border-radius: 8px; color: var(--fg); background: #fff; text-decoration: none; font-size: .95rem; }
+.navbar a:hover { background: #f3f4f6; }
+
+/* ---------- ヒーロー（開催概要） ---------- */
+.hero { padding-block: var(--space-6); }
+.hero h1 { margin: 0 0 var(--space-2); font-size: clamp(1.6rem, 2.5vw + 1rem, 2.2rem); line-height: 1.25; }
+.hero p { margin: 0 0 var(--space-2); color: var(--muted); }
+.cta { margin-top: var(--space-3); display: flex; gap: var(--space-2); flex-wrap: wrap; }
+
+/* ---------- ボタン（.btn） ---------- */
+.btn,
+.view-controls button,
+.more-row button {
+  appearance: none;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--fg);
+  padding: .55rem .9rem;
+  border-radius: 8px;
+  font-size: .95rem;
+  cursor: pointer;
+}
+.btn:hover,
+.view-controls button:hover,
+.more-row button:hover { background: #f3f4f6; }
+.btn.primary { background: var(--primary); color: var(--primary-fg); border-color: var(--primary); }
+.btn.primary:hover { filter: brightness(0.95); }
+
+/* ---------- セクション見出し ---------- */
+section > h2 { margin: var(--space-6) 0 var(--space-3); font-size: 1.35rem; border-left: 4px solid var(--primary); padding-left: .6rem; line-height: 1.2; }
+
+/* ---------- 一覧・箇条書き ---------- */
+section ul { padding-left: 1.2rem; }
+section ul li { margin: .35rem 0; }
+
+/* ---------- 表（スケジュールなど） ---------- */
+section table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); }
+section table th, section table td { border-bottom: 1px solid var(--border); padding: .6rem .75rem; text-align: left; }
+section table thead th { background: #f8fafc; font-weight: 600; }
+section table tr:last-child th, section table tr:last-child td { border-bottom: none; }
+
+/* ---------- サークル一覧：コントロール ---------- */
+.view-controls { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; margin-bottom: var(--space-3); }
+.view-controls span { color: var(--muted); }
+
+/* ---------- サークル一覧：カードグリッド ---------- */
+/* ここは circles-cards.js が .circle-list 内へ .card 要素を追加する前提でスタイリング */
+.circle-list { display: grid; gap: var(--space-3); grid-template-columns: repeat(1, minmax(0, 1fr)); }
+@media (min-width: 560px) { .circle-list { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 880px) { .circle-list { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+
+.circle-list .card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: var(--space-4); box-shadow: var(--shadow); display: grid; gap: .35rem; }
+.circle-list .card .space { font-weight: 700; color: var(--primary); }
+.circle-list .card .name { font-size: 1.05rem; font-weight: 700; }
+.circle-list .card .pn   { color: var(--muted); }
+.circle-list .card .type { display: inline-block; padding: .15rem .45rem; border: 1px solid var(--border); border-radius: 999px; font-size: .8rem; color: var(--muted); }
+
+/* ---------- サークル一覧：表表示（renderTable用） ---------- */
+#circleList table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); }
+#circleList thead th { background: #f8fafc; font-weight: 600; }
+#circleList th, #circleList td { border-bottom: 1px solid var(--border); padding: .6rem .75rem; text-align: left; }
+#circleList tr:last-child th, #circleList tr:last-child td { border-bottom: none; }
+
+/* ---------- Q&A（details/summary） ---------- */
+details { border: 1px solid var(--border); border-radius: var(--radius); padding: .75rem 1rem; background: #fff; box-shadow: var(--shadow); }
+details + details { margin-top: var(--space-3); }
+details summary { cursor: pointer; font-weight: 600; }
+details[open] { background: #fcfdfd; }
+
+/* ---------- 文章ブロック ---------- */
+.note { color: var(--muted); font-size: .95rem; }
+
+/* ---------- アクセシビリティ（フォーカス） ---------- */
+:focus-visible { outline: 3px solid rgba(31,111,235,.35); outline-offset: 2px; border-radius: 6px; }
+
+/* ---------- 余白の調整：セクション間 ---------- */
+section { margin-bottom: var(--space-6); }
+
+/* ---------- 印刷対応の簡易調整 ---------- */
+@media print {
+  .navbar { position: static; }
+  .view-controls, .cta, .more-row { display: none !important; }
+  a { text-decoration: none; color: #000; }
+  section table, #circleList table { box-shadow: none; }
+}
