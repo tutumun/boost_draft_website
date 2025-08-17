@@ -4,116 +4,87 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>ブースト！｜公式ドラフト</title>
-  <!--
-    この index.html はコミット 648737f3039b65fd19c753763883d1b9e4956e23 の内容を
-    「内容のみ参照」して再構成した版です（HTML構造は等価、JS/CSSの参照は現行分割に合わせて調整）。
-    参照元（テキスト内容）: https://raw.githubusercontent.com/tutumun/boost_draft_website/648737f3039b65fd19c753763883d1b9e4956e23/docs/index.html
-
-    分割済みアセットへの対応:
-      - CSS   -> assets/scr/site.css
-      - JS    -> assets/scr/circles-cards.js, assets/scr/circles-view.js
-    既存 JS は #circleList を描画ターゲットとして利用するため、このIDは必ず維持します。
-  -->
   <link rel="stylesheet" href="assets/scr/site.css" />
 </head>
 <body>
-  <!-- ========== ページ先頭 ナビ（コミットのアンカー配列に相当） ========== -->
-  <nav aria-label="ページ内ナビゲーション" class="top-nav">
-    <!-- a要素のhrefは各セクションIDに対応。コミット表示の [最新情報][当日スケジュール] ... 等を再現 -->
-    <a href="#news">最新情報</a>
-    <a href="#schedule">当日スケジュール</a>
-    <a href="#general">一般参加</a>
-    <a href="#circle">サークル参加</a>
-    <a href="#circles">サークル一覧</a>
-    <a href="#access">アクセス</a>
-    <a href="#qa">Q&A</a>
-    <a href="#contact">お問い合わせ</a>
-  </nav>
-
-  <!-- ========== ヒーロー / 開催概要（コミットの上部ブロックを反映） ========== -->
-  <header id="hero">    <!-- フライヤー画像：コミット版の「イベントフライヤー（イメージ）」を実表示（画像は assets/img/flyer.jpg を想定。必要に応じて差し替え） -->
-    <img src="assets/img/flyers/flyer-placeholder.png" alt="イベントフライヤー（イメージ）" style="max-width:100%;height:auto;" />
-
-    <h1>ブースト！</h1>
-
-    <!-- 開催情報（テキストはコミット参照） -->
-    <p>開催日 2025/11/23（日） 10:00–16:00</p>
-    <p>会 場 ○○コンベンションセンター</p>
-    <p>入 場 一般 1,000円／再入場可</p>
-
-    <!-- コミット由来の主要導線ボタン（一般／サークル） -->
-    <p>
-      <a href="#general" class="btn">一般参加ガイド</a>
-      <a href="#circle" class="btn">サークル参加ガイド</a>
-    </p>
+  <header id="hero">
+    <div class="hero-inner">
+      <img src="assets/img/flyer.jpg" alt="イベントフライヤー（イメージ）" class="flyer" />
+      <div class="hero-text">
+        <h1>ブースト！</h1>
+        <p class="date">2025/11/23（日） 10:00–16:00</p>
+        <p class="venue">会場：○○コンベンションセンター</p>
+        <p class="fee">入場：一般 1,000円（再入場可）</p>
+        <p class="hero-links">
+          <a href="#general" class="btn">一般参加ガイド</a>
+          <a href="#circle" class="btn">サークル参加ガイド</a>
+        </p>
+      </div>
+    </div>
   </header>
 
+  <nav class="top-nav">
+    <ul>
+      <li><a href="#news">最新情報</a></li>
+      <li><a href="#schedule">当日スケジュール</a></li>
+      <li><a href="#general">一般参加</a></li>
+      <li><a href="#circle">サークル参加</a></li>
+      <li><a href="#circles">サークル一覧</a></li>
+      <li><a href="#access">アクセス</a></li>
+      <li><a href="#qa">Q&A</a></li>
+      <li><a href="#contact">お問い合わせ</a></li>
+    </ul>
+  </nav>
+
   <main>
-    <!-- ========== 最新情報 ========== -->
-    <section id="news" aria-labelledby="newsTitle">
-      <h2 id="newsTitle">最新情報</h2>
-      <!-- コミットの1件を反映。以降は content/notices.md 等に移してもOK -->
+    <section id="news" class="section">
+      <h2>最新情報</h2>
       <article>
         <h3><time datetime="2025-08-11">2025/08/11</time> ドラフト公開</h3>
         <p>GitHub Pagesにてドラフト版を公開しました。</p>
       </article>
     </section>
 
-    <!-- ========== 当日スケジュール ========== -->
-    <section id="schedule" aria-labelledby="scheduleTitle">
-      <h2 id="scheduleTitle">当日スケジュール</h2>
-      <ul>
-        <li>09:00 サークル入場開始</li>
-        <li>10:00 一般入場開始</li>
-        <li>12:00 抽選企画（予定）</li>
-        <li>16:00 閉場</li>
+    <section id="schedule" class="section">
+      <h2>当日スケジュール</h2>
+      <ul class="timeline">
+        <li><time>09:00</time> サークル入場開始</li>
+        <li><time>10:00</time> 一般入場開始</li>
+        <li><time>12:00</time> 抽選企画（予定）</li>
+        <li><time>16:00</time> 閉場</li>
       </ul>
       <p class="note">時刻は目安です。変更の可能性があります。</p>
     </section>
 
-    <!-- ========== 一般参加ガイド ========== -->
-    <section id="general" aria-labelledby="generalTitle">
-      <h2 id="generalTitle">一般参加ガイド</h2>
-      <h3>入場方法</h3>
-      <p>入場料金：1,000円。再入場可（リストバンド提示）。</p>
-      <h3>年齢確認</h3>
-      <p>R-18エリアは年齢確認必須。公的身分証をご提示ください。</p>
-      <h3>持ち物・注意</h3>
-      <p>小銭・エコバッグ・水分補給。会場指示に従ってください。</p>
+    <section id="general" class="section">
+      <h2>一般参加ガイド</h2>
+      <ul>
+        <li>入場料金：1,000円。再入場可（リストバンド提示）。</li>
+        <li>R-18エリアは年齢確認必須。公的身分証をご提示ください。</li>
+        <li>小銭・エコバッグ・水分補給を推奨。会場指示に従ってください。</li>
+      </ul>
     </section>
 
-    <!-- ========== サークル参加ガイド ========== -->
-    <section id="circle" aria-labelledby="circleTitle">
-      <h2 id="circleTitle">サークル参加ガイド</h2>
-      <h3>参加資格</h3>
-      <p>オリジナル同人の頒布を行う個人・団体。</p>
-      <h3>ブース・料金</h3>
-      <p>1ブース 5,000円（机半分／椅子1脚）</p>
-      <h3>当日フロー</h3>
-      <p>搬入→設営→開場→撤収。見本誌確認あり。</p>
+    <section id="circle" class="section">
+      <h2>サークル参加ガイド</h2>
+      <ul>
+        <li>対象：オリジナル同人の頒布を行う個人・団体。</li>
+        <li>参加費：1ブース 5,000円（机半分／椅子1脚）。</li>
+        <li>搬入→設営→開場→撤収の流れ。見本誌確認あり。</li>
+      </ul>
     </section>
 
-    <!-- ========== サークル一覧（UIはコミット文言を反映、JSは分割済みを呼び出す） ========== -->
-    <section id="circles" aria-labelledby="circlesTitle">
-      <h2 id="circlesTitle">サークル一覧</h2>
-
-      <!-- コミット文言のUI要素を素直に再現（必要に応じてJS側でフック）。
-           既存の circles-*.js は #circleList を描画するため、この直下に配置。 -->
-
-      <!-- 表示切替（既存JSのボタンIDに合わせてラベルだけコミット文言に） -->
+    <section id="circles" class="section">
+      <h2>サークル一覧</h2>
       <div class="controls-row">
         <button id="viewCards" type="button">カード表示</button>
         <button id="viewTable" type="button">表表示（Excel用）</button>
-
-        <!-- 並び順：既存のソートボタンをラベル調整 -->
-        <span>並び順: </span>
+        <span>並び順:</span>
         <button id="sortKana" type="button">五十音順（サークル名）</button>
         <button id="sortSpace" type="button">スペース順（島-番号）</button>
       </div>
-
-      <!-- 50音・企業タブ（将来のフィルタ用。現状はアンカー/装飾のみ） -->
-      <p class="kana-tabs">
-        全件
+      <nav class="kana-tabs">
+        <a href="#all">全件</a>
         <a href="#kana-a">あ行</a>
         <a href="#kana-ka">か行</a>
         <a href="#kana-sa">さ行</a>
@@ -125,36 +96,26 @@
         <a href="#kana-ra">ら行</a>
         <a href="#kana-wa">わ行</a>
         <a href="#kana-biz">企業</a>
-      </p>
-
-      <!-- 検索UI（まだ既存JSには未実装のため、将来用のフック要素としてマークアップのみ） -->
+      </nav>
       <div class="search-row">
         <label for="circleSearch">サークル検索</label>
         <input id="circleSearch" type="search" placeholder="サークル名 / PN / スペース番号 / 区分" />
         <output id="circleCount" aria-live="polite">該当：0 件</output>
       </div>
-
-      <!-- さらに表示（将来のページング用の占位。未実装でも表示に影響しない） -->
+      <div id="circleList"></div>
       <div class="more-row">
         <button id="showMore" type="button">さらに表示</button>
       </div>
-
-      <!-- 既存JSがここへカード/テーブルを描画する（必須ID） -->
-      <div id="circleList"></div>
-
-      <!-- Excelコピペ用表の説明（コミット文言に基づく備考） -->
-      <p class="muted">※ この表を選択してコピーすると、Excelに列ごと整形されて貼り付けできます。</p>
+      <p class="muted">※ この表をコピーすると、Excelに列ごと整形されて貼り付けできます。</p>
     </section>
 
-    <!-- ========== アクセス ========== -->
-    <section id="access" aria-labelledby="accessTitle">
-      <h2 id="accessTitle">アクセス</h2>
-      <p>最寄駅から徒歩5分。駐車は近隣コインPをご利用ください。</p>
+    <section id="access" class="section">
+      <h2>アクセス</h2>
+      <p>最寄駅から徒歩5分。駐車は近隣コインパーキングをご利用ください。</p>
     </section>
 
-    <!-- ========== Q&A ========== -->
-    <section id="qa" aria-labelledby="qaTitle">
-      <h2 id="qaTitle">Q&A</h2>
+    <section id="qa" class="section">
+      <h2>Q&A</h2>
       <details>
         <summary>再入場は可能ですか？</summary>
         <p>可能です。リストバンドをご提示ください。</p>
@@ -169,24 +130,17 @@
       </details>
     </section>
 
-    <!-- ========== お問い合わせ ========== -->
-    <section id="contact" aria-labelledby="contactTitle">
-      <h2 id="contactTitle">お問い合わせ</h2>
+    <section id="contact" class="section">
+      <h2>お問い合わせ</h2>
       <p>不具合報告・改善要望は、以下から匿名で送信できます（画像のみ添付可）。</p>
-      <!-- コミットの「Issueフォームを開く」は example.com。公開時に実URLへ差し替え -->
       <p><a class="btn" href="https://example.com" target="_blank" rel="noopener">Issueフォームを開く</a></p>
       <p class="note">※緊急時は現地スタッフへお声がけください。</p>
     </section>
   </main>
 
-  <!-- ========== 分割済みJSの読み込み ========== -->
   <script src="assets/scr/circles-cards.js"></script>
-  $1
-  
-  <!-- 初期表示：カード表示をデフォルトにする（データが0件でも「表」ではなく「カード」モードで初期化） -->
+  <script src="assets/scr/circles-view.js"></script>
   <script>
-    // DOM 構築後にカード表示ボタンを自動押下
-    // ※ サークルデータ（content/circle-list.csv）が未配置でも表示モードだけはカードになります
     document.addEventListener('DOMContentLoaded', () => {
       const btn = document.getElementById('viewCards');
       if (btn) btn.click();
