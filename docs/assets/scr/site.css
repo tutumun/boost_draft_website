@@ -92,16 +92,36 @@ section table tr:last-child th, section table tr:last-child td { border-bottom: 
 .view-controls span { color: var(--muted); }
 
 /* ---------- サークル一覧：カードグリッド ---------- */
-/* ここは circles-cards.js が .circle-list 内へ .card 要素を追加する前提でスタイリング */
 .circle-list { display: grid; gap: var(--space-3); grid-template-columns: repeat(1, minmax(0, 1fr)); }
 @media (min-width: 560px) { .circle-list { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (min-width: 880px) { .circle-list { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 
-.circle-list .card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: var(--space-4); box-shadow: var(--shadow); display: grid; gap: .35rem; }
-.circle-list .card .space { font-weight: 700; color: var(--primary); }
-.circle-list .card .name { font-size: 1.05rem; font-weight: 700; }
-.circle-list .card .pn   { color: var(--muted); }
-.circle-list .card .type { display: inline-block; padding: .15rem .45rem; border: 1px solid var(--border); border-radius: 999px; font-size: .8rem; color: var(--muted); }
+/* カード全体を2カラムに分割：左にサークルカット、右に情報 */
+.circle-list .card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  align-items: start;
+}
+.circle-list .card img.cut {
+  width: 100%;
+  height: auto;
+  border-radius: var(--radius);
+  object-fit: cover;
+}
+.circle-list .card .info { display: flex; flex-direction: column; gap: .35rem; }
+.circle-list .card .info .name { font-size: 1.05rem; font-weight: 700; }
+.circle-list .card .info .space { font-weight: 700; color: var(--primary); }
+.circle-list .card .info .pn { color: var(--muted); }
+
+/* SNSリンクを横並びでアイコン表示 */
+.circle-list .card .info .sns { display: flex; gap: .5rem; margin-top: .25rem; }
+.circle-list .card .info .sns a img { width: 20px; height: 20px; border-radius: 4px; display: block; }
 
 /* ---------- サークル一覧：表表示（renderTable用） ---------- */
 #circleList table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); }
