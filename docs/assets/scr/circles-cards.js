@@ -31,10 +31,11 @@
       const text = await res.text();
 
       // 行ごとに分割（空行を除外）。引用やカンマを厳密に扱う必要があれば CSV パーサ導入を検討。
-      const rows = text
-        .split(/\r?\n/)
-        .map((l) => l.trim())
-        .filter((l) => l.length > 0);
+  const rows = text
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0);
+
 
       const data = rows.map((line) => {
         const cells = line.split(",").map((s) => s.trim());
@@ -51,22 +52,30 @@
     }
   }
 
-  /**
-   * SNSリンクのアイコン画像パスを返す（存在しないキーは undefined）。
-   * アイコン画像は `assets/img/icons/` 配下想定（SVG/PNG どちらでも可）。
-   */
-  function iconFor(service) {
-    const base = "assets/img/icons"; // 例: x.svg, pixiv.svg, booth.svg, web.svg, instagram.svg, bluesky.svg, tumblr.svg
-    const map = {
-      x: `${base}/x.svg`,
-      pixiv: `${base}/pixiv.svg`,
-      booth: `${base}/booth.svg`,
-      web: `${base}/web.svg`,
-      instagram: `${base}/instagram.svg`,
-      bluesky: `${base}/bluesky.svg`,
-      tumblr: `${base}/tumblr.svg`,
-    };
-    return map[service];
+  // ========================
+  // favicon取得ポリシー
+  // ①（本番用 / コメントアウト）：WPにキャッシュしたPNGを配信
+  //    例: /wp-content/uploads/favicons/example.com.png
+  //    ※本番移行時にこの関数を有効化し、②を無効化してください。
+  // ========================
+  /*
+  function faviconURL(host){
+    // 本番：サーバー側で事前生成しておく（WP-Cronで週1更新など）
+    return `/wp-content/uploads/favicons/${host}.png`;
+  }
+  */
+
+  // ========================
+  // ②（ドラフト用 / 有効）：CDNから取得（Google S2）
+  //    相手サイトへ直接アクセスしないので負荷集中を回避
+  // ========================
+  function faviconURL(host, size = 32){
+    return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=${size}`;
+  }
+
+  // URL → ホスト名（失敗時は null）
+  function hostFromUrl(u){
+    try { return new URL(u).hostname; } catch { return null; }
   }
 
   /**
@@ -119,16 +128,19 @@
     (Object.keys(sns)).forEach((key) => {
       const url = (sns[key] || "").trim();
       if (!url) return; // 空はスキップ
+
       const a = document.createElement("a");
       a.href = url; a.target = "_blank"; a.rel = "noopener";
 
-      const ico = iconFor(key);
-      if (ico) {
+      // --- ここで favicon を取得して表示（Google S2） ---
+      const host = hostFromUrl(url);
+      if (host) {
         const img = document.createElement("img");
         img.className = "favicon";
         img.alt = "";
         img.loading = "lazy";
-        img.src = ico;
+        img.width = 18; img.height = 18;
+        img.src = faviconURL(host, 32);
         a.appendChild(img);
       }
       // アクセシビリティのため、サービス名テキストも入れておく
@@ -156,14 +168,13 @@
     });
   }
 
-  // グローバル公開：circles-view.js 側のソート・切替から呼ばれる想定
+  // グローバル公開：circles-view.js 側の並べ替え・切替から呼ばれる想定
   window.renderCards = renderCards;
 
   // 初期ロード：CSV→window.circleData に格納し、初期表示をカードで描画
   document.addEventListener("DOMContentLoaded", async () => {
     const data = await loadCircles();
     window.circleData = Array.isArray(data) ? data : [];
-    // 初期表示はカード（HTML/内容は変更しないまま見た目だけ反映）
     renderCards(window.circleData);
   });
 })();
