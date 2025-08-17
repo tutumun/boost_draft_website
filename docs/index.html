@@ -126,6 +126,20 @@
 	.to-top{position:fixed;right:16px;bottom:16px;z-index:30;padding:10px 12px;border-radius:999px;
 	  background:#0f172a;color:#fff;opacity:.85;display:none}
 	.to-top.is-show{display:block}
+      
+    /* ===== ▼ 表示切替(カード/表)＆並び替え(五十音/スペース) 用の最小スタイル ===== */
+    .list-toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:10px 0 14px}
+    .view-tabs{display:inline-flex;border:1px solid var(--c-line);border-radius:10px;overflow:hidden}
+    .view-tabs button{padding:8px 12px;border:0;background:#f6f8fa;cursor:pointer}
+    .view-tabs button.is-active{background:#e0f2fe;font-weight:700}
+    .sort-select{padding:8px 10px;border:1px solid var(--c-line);border-radius:10px;background:#fff}
+
+    /* Excelコピペ用の表 */
+    #excel-view{display:none}
+    .excel-wrap{overflow:auto}
+    table.excel{border-collapse:collapse;width:100%;background:#fff}
+    table.excel th,table.excel td{border:1px solid #cbd5e1;padding:6px 8px;white-space:nowrap}
+    table.excel thead th{position:sticky;top:0;background:#f8fafc}
   </style>
 </head>
 <body>
@@ -228,7 +242,20 @@
        ========================================= -->
   <section id="list" aria-labelledby="list-h">
     <h2 id="list-h">サークル一覧</h2>
-    <p class="desc">検索（サークル名 / PN / スペース番号 / 区分）＋50音/企業で絞り込みできます。</p>
+    <p class="desc">検索（サークル名 / PN / スペース番号 / 区分）＋50音/企業で絞り込みできます。Excelでコピペしたい場合は「表表示」に切り替えてください。</p>
+
+    <!-- ▼ 追加：ビュー切替＆並び順（ユーザーが選べるUI） -->
+    <div class="list-toolbar" role="region" aria-label="表示切替と並び順">
+      <div class="view-tabs" role="tablist" aria-label="表示切替">
+        <button id="tab-card" class="is-active" role="tab" aria-selected="true" type="button">カード表示</button>
+        <button id="tab-table" role="tab" aria-selected="false" type="button">表表示（Excel用）</button>
+      </div>
+      <label for="sort-mode">並び順:</label>
+      <select id="sort-mode" class="sort-select" aria-label="並び順の選択">
+        <option value="kana" selected>五十音順（サークル名）</option>
+        <option value="space">スペース順（島-番号）</option>
+      </select>
+    </div>
 
     <!-- 50音インデックス（企業を末尾に追加） -->
     <nav class="kana" aria-label="50音インデックス">
@@ -266,6 +293,24 @@
 	</div>
 	<!-- 無限読み足しの観測点（画面下） -->
 	<div id="observer" class="observer" aria-hidden="true"></div>
+
+    <!-- ▼ Excelコピペ用の表ビュー（全件表示） -->
+    <div id="excel-view" aria-labelledby="tab-table">
+      <div class="excel-wrap">
+        <table class="excel" id="excel-table">
+          <thead>
+            <tr>
+              <th>サークル名</th>
+              <th>PN</th>
+              <th>スペース番号</th>
+              <th>区分</th>
+            </tr>
+          </thead>
+          <tbody id="excel-tbody"></tbody>
+        </table>
+      </div>
+      <p class="sr">※ この表を選択してコピーすると、Excelに列ごと整形されて貼り付けできます。</p>
+    </div>
 
   </section>
 
@@ -712,5 +757,149 @@
 
   <!-- 先頭へ戻る（フローティング） -->
   <button id="toTop" class="to-top" type="button" aria-label="先頭へ戻る">▲</button>
+  <script>
+/* 既存のカード生成ロジックには手を触れず、
+   表示切替（カード/表）、並び替え（五十音/スペース）、
+   Excel向け表ビュー（CSV→フィルタ→ソート→全件表示）を“後付け”で実装します。 */
+(function(){
+  // ▼ DOM参照
+  const tabCard = document.getElementById('tab-card');
+  const tabTable = document.getElementById('tab-table');
+  const sortMode = document.getElementById('sort-mode');
+  const cardsWrap = document.getElementById('circle-cards');
+  const observerEl = document.getElementById('observer');
+  const loadmoreWrap = document.getElementById('loadmore-wrap');
+  const excelView = document.getElementById('excel-view');
+  const excelTbody = document.getElementById('excel-tbody');
+  const q = document.getElementById('circle-q');
+  const kanaBtns = Array.from(document.querySelectorAll('.kana__btn'));
+  const hit = document.getElementById('hit');
+
+  if(!tabCard || !tabTable || !sortMode || !cardsWrap || !excelView || !excelTbody) return;
+
+  // ▼ 状態
+  const state = { view:'card', sort:'kana' };
+
+  // ▼ 現在の50音キー（aria-pressed=true のボタン）
+  function currentKana(){
+    const b = kanaBtns.find(btn => btn.getAttribute('aria-pressed') === 'true');
+    return b ? b.dataset.kana : 'all';
+  }
+
+  // ▼ 日本語比較 & スペース比較（A-01 等に対応）
+  const collatorJa = new Intl.Collator('ja', { sensitivity: 'base', numeric: false });
+  function normalizeSpace(s){
+    if(!s) return null;
+    const m = String(s).trim().match(/^([A-Za-zぁ-んァ-ン一-龯]+)[-\s]?(\d{1,3})$/);
+    if(!m) return [String(s).trim(), 0];
+    return [m[1], Number(m[2])||0];
+  }
+  function compareSpace(a,b){
+    const ax = normalizeSpace(a); const bx = normalizeSpace(b);
+    if(!ax && !bx) return 0; if(!ax) return 1; if(!bx) return -1;
+    const ab = collatorJa.compare(ax[0], bx[0]);
+    return ab!==0 ? ab : (ax[1]-bx[1]);
+  }
+
+  // ▼ 簡易CSVパーサ（BOMは実体文字で除去）
+  function parseCSV(text){
+    text = text.replace(/^﻿/, ''); // 先頭BOM(U+FEFF)を除去
+    const out=[]; let row=[], field='', inQ=false;
+    for(let i=0;i<text.length;i++){
+      const c=text[i], n=text[i+1];
+      if(inQ){
+        if(c==='"' && n==='"'){ field+='"'; i++; }
+        else if(c==='"'){ inQ=false; }
+        else { field+=c; }
+      }else{
+        if(c==='"'){ inQ=true; }
+        else if(c===','){ row.push(field); field=''; }
+        else if(c==='\n'){ row.push(field); out.push(row); row=[]; field=''; }
+        else if(c==='\r'){ /* ignore */ }
+        else { field+=c; }
+      }
+    }
+    row.push(field); out.push(row); return out;
+  }
+  function csvToObjects(text){
+    const rows = parseCSV(text).filter(r => r.length && r.join('').trim()!=='');
+    if(!rows.length) return [];
+    const header = rows[0].map(h=>h.trim());
+    return rows.slice(1).map(cols=>{
+      const o={}; header.forEach((h,i)=>o[h]= (cols[i]||'').trim()); return o;
+    });
+  }
+
+  // ▼ ひらがな正規化 & フィルタ（検索 + 50音/企業）
+  function toHira(str){
+    if(!str) return '';
+    str = str.normalize('NFKC').replace(/[\u30A1-\u30F6]/g, ch=>String.fromCharCode(ch.charCodeAt(0)-0x60));
+    return str.replace(/\s+/g,'').toLowerCase();
+  }
+  function rowPass(r){
+    const needle = toHira(q.value||'');
+    const hay = [r.name||'', r.pn||'', r.space||'', r.cat||''].map(toHira).join('|');
+    if(needle && !hay.includes(needle)) return false;
+    const row = currentKana();
+    if(row==='all') return true;
+    return (String(r.kana||'').toLowerCase()===row); // CSVのkanaに 'kigyou' などが入る想定
+  }
+
+  // ▼ 並び替え（五十音/スペース）
+  function sortRows(rows){
+    const arr = rows.slice();
+    if(state.sort==='space'){
+      arr.sort((a,b)=>{ const r=compareSpace(a.space||'', b.space||''); return r!==0?r:collatorJa.compare(a.name||'', b.name||''); });
+    }else{
+      arr.sort((a,b)=>{ const r=collatorJa.compare(a.name||'', b.name||''); return r!==0?r:compareSpace(a.space||'', b.space||''); });
+    }
+    return arr;
+  }
+
+  // ▼ 表の描画（CSV→フィルタ→ソート→全件表示）
+  let tableCache = null; // 一度ロードしたら再利用
+  async function renderTable(){
+    if(!excelView) return;
+    if(!tableCache){
+      const res = await fetch(`./content/circle-list.csv?ts=${Date.now()}`);
+      if(!res.ok){ excelTbody.innerHTML = '<tr><td colspan="4">読み込み失敗</td></tr>'; return; }
+      const text = await res.text();
+      tableCache = csvToObjects(text);
+    }
+    const rows = sortRows(tableCache.filter(rowPass));
+    excelTbody.innerHTML = rows.map(r=>
+      `<tr><td>${r.name||''}</td><td>${r.pn||''}</td><td>${r.space||''}</td><td>${r.cat||''}</td></tr>`
+    ).join('');
+    if(hit) hit.textContent = String(rows.length); // 件数も同期
+  }
+
+  // ▼ ビュー切替（カード/表）
+  function switchView(next){
+    state.view = next;
+    const isCard = (next==='card');
+    cardsWrap.style.display = isCard? '' : 'none';
+    observerEl.style.display = isCard? '' : 'none';
+    loadmoreWrap.style.display = isCard? '' : 'none';
+    excelView.style.display = isCard? 'none' : '';
+    tabCard.classList.toggle('is-active', isCard);
+    tabTable.classList.toggle('is-active', !isCard);
+    tabCard.setAttribute('aria-selected', String(isCard));
+    tabTable.setAttribute('aria-selected', String(!isCard));
+    if(!isCard){ renderTable(); }
+  }
+  tabCard.addEventListener('click', ()=> switchView('card'));
+  tabTable.addEventListener('click', ()=> switchView('table'));
+
+  // ▼ 並び順変更（表ビューに即反映／カードは既存ロジック優先）
+  sortMode.addEventListener('change', ()=>{ state.sort = sortMode.value; if(state.view==='table') renderTable(); });
+
+  // ▼ 検索・50音変更時、表表示中なら再描画
+  q.addEventListener('input', ()=>{ if(state.view==='table') renderTable(); });
+  kanaBtns.forEach(btn=> btn.addEventListener('click', ()=>{ if(state.view==='table') renderTable(); }));
+
+  // 初期状態：カード表示/五十音
+  sortMode.value = 'kana';
+})();
+</script>
 </body>
 </html>
