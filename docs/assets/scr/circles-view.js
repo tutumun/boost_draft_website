@@ -205,111 +205,80 @@
    * 各表示モード
    * ========================= */
 
-  // 50音表示（カード）
-  function renderKanaView(initialKey = "あ") {
-    window.__currentView = "kana";
-    window.__currentFilterKey = initialKey;
+  // 五十音表示（カード）—「すべて」選択時の並びを修正
+// 仕様：あ→か→さ→た→な→は→ま→や→ら→わ の順で結合し、
+//       「企業」「委託」は最後にまとめて（一般の後ろに）付ける。
+function renderKanaView(initialKey = "あ") {
+  window.__currentView = "kana";
+  window.__currentFilterKey = initialKey;
 
-    const base = [...getData()].sort(compareKana);
-    const rows = ["あ","か","さ","た","な","は","ま","や","ら","わ"];
+  // 全データを50音順でソート（レコード同士の比較は compareKana）
+  const baseAll = [...getData()].sort(compareKana);
 
-    setSubControls(
-      `<div class="row-buttons" role="group" aria-label="50音行フィルタ">
-        ${rows.map(r => `<button type="button" data-filter="${r}">${r}</button>`).join("")}
-        <button type="button" data-filter="corp">企業</button>
-        <button type="button" data-filter="all">すべて</button> <!-- ★追加 -->
-      </div>`,
-      (key) => {
-        window.__currentFilterKey = key;
-        let data = base;
-        if (key === "corp") {
-          const hasCat = data.some(d => (d.cat ?? d.type ?? "").trim() !== "");
-          data = hasCat ? data.filter(d => getCatLower(d) === "企業") : [];
-        } else if (key === "all") {
-          // 全件
-        } else {
-          data = data.filter(d => rowKeyForRecord(d) === key);
-        }
-        if (typeof window.renderCards === "function") {
-          window.renderCards(data);
-          toggleLoadMore(data.length > 20);
-        }
+  // 行ボタン
+  const rows = ["あ","か","さ","た","な","は","ま","や","ら","わ"];
+
+  // サブボタン生成：「すべて」を含む（企業ボタンもあり）
+  setSubControls(
+    `<div class="row-buttons" role="group" aria-label="50音行フィルタ">
+      ${rows.map(r => `<button type="button" data-filter="${r}">${r}</button>`).join("")}
+      <button type="button" data-filter="corp">企業</button>
+      <button type="button" data-filter="all">すべて</button>
+    </div>`,
+    (key) => {
+      window.__currentFilterKey = key;
+      const viewData = buildKanaViewData(baseAll, key); // ★ 下のヘルパで構築
+      if (typeof window.renderCards === "function") {
+        window.renderCards(viewData);
+        toggleLoadMore(viewData.length > 20);
       }
-    );
+    }
+  );
 
-    // 初回描画
-    let first = base;
-    if (initialKey === "corp") {
-      const hasCat = base.some(d => (d.cat ?? d.type ?? "").trim() !== "");
-      first = hasCat ? base.filter(d => getCatLower(d) === "企業") : [];
-    } else if (initialKey !== "all") {
-      first = base.filter(d => rowKeyForRecord(d) === initialKey);
-    }
-    if (typeof window.renderCards === "function") {
-      window.renderCards(first);
-      toggleLoadMore(first.length > 20);
-    }
-    const sub = ensureSubControls();
-    const initBtn = sub.querySelector(`[data-filter="${initialKey}"]`);
-    if (initBtn) initBtn.classList.add("active");
+  // 初回描画
+  const firstData = buildKanaViewData(baseAll, initialKey);
+  if (typeof window.renderCards === "function") {
+    window.renderCards(firstData);
+    toggleLoadMore(firstData.length > 20);
   }
 
-  // スペース順表示（カード）
-  function renderSpaceView(initialKey = "A") {
-    window.__currentView = "space";
-    window.__currentFilterKey = initialKey;
+  // active 表示
+  const sub = (document.getElementById("subControls")) || ensureSubControls();
+  const initBtn = sub.querySelector(`[data-filter="${initialKey}"]`);
+  if (initBtn) initBtn.classList.add("active");
 
-    const base = [...getData()].sort((a, b) => compareSpaceStr(a.space || "", b.space || ""));
-    const letters = ["A","B","C","D","E"];
+  /**
+   * 「すべて」時は 50音行順で一般 → 企業 → 委託 の順に結合
+   * 通常の行指定時は該当行のみ、企業指定は cat=企業 のみ。
+   */
+  function buildKanaViewData(sortedAll, key) {
+    // cat 判定（小文字化済みで比較）
+    const isCorp   = (d) => getCatLower(d) === "企業";
+    const isItaku  = (d) => getCatLower(d) === "委託";
 
-    setSubControls(
-      `<div class="row-buttons" role="group" aria-label="スペース行フィルタ">
-        ${letters.map(L => `<button type="button" data-filter="${L}">${L}</button>`).join("")}
-        <button type="button" data-filter="corp">企業</button>
-        <button type="button" data-filter="itaku">委託</button>
-        <button type="button" data-filter="all">すべて</button> <!-- ★追加 -->
-      </div>`,
-      (key) => {
-        window.__currentFilterKey = key;
-        let data = base;
-        if (key === "corp") {
-          const hasCat = data.some(d => (d.cat ?? d.type ?? "").trim() !== "");
-          data = hasCat ? data.filter(d => getCatLower(d) === "企業") : [];
-        } else if (key === "itaku") {
-          const hasCat = data.some(d => (d.cat ?? d.type ?? "").trim() !== "");
-          data = hasCat ? data.filter(d => getCatLower(d) === "委託") : [];
-        } else if (key === "all") {
-          // 全件
-        } else {
-          const re = new RegExp(`^${key}`, "i");
-          data = data.filter(d => re.test(String(d.space || "")));
-        }
-        if (typeof window.renderCards === "function") {
-          window.renderCards(data);
-          toggleLoadMore(data.length > 20);
-        }
-      }
-    );
-
-    let first = base;
-    if (initialKey === "corp") {
-      const hasCat = base.some(d => (d.cat ?? d.type ?? "").trim() !== "");
-      first = hasCat ? base.filter(d => getCatLower(d) === "企業") : [];
-    } else if (initialKey === "itaku") {
-      const hasCat = base.some(d => (d.cat ?? d.type ?? "").trim() !== "");
-      first = hasCat ? base.filter(d => getCatLower(d) === "委託") : [];
-    } else if (initialKey !== "all") {
-      const reInit = new RegExp(`^${initialKey}`, "i");
-      first = base.filter(d => reInit.test(String(d.space || "")));
+    if (key === "corp") {
+      // 企業のみ
+      return sortedAll.filter(isCorp);
     }
-    if (typeof window.renderCards === "function") {
-      window.renderCards(first);
-      toggleLoadMore(first.length > 20);
+    if (key === "all") {
+      // 1) 一般（企業・委託を除く）を 50音行順で連結
+      const general = sortedAll.filter(d => !isCorp(d) && !isItaku(d));
+      let mergedGeneral = [];
+      rows.forEach(r => {
+        // 行キー一致のものを順に追加
+        const part = general.filter(d => rowKeyForRecord(d) === r);
+        mergedGeneral = mergedGeneral.concat(part);
+      });
+      // 2) 企業・委託を最後にまとめて付ける（並びは元の compareKana 順）
+      const corp  = sortedAll.filter(isCorp);
+      const itaku = sortedAll.filter(isItaku);
+      return mergedGeneral.concat(corp, itaku);
     }
-    const sub = ensureSubControls();
-    const initBtn = sub.querySelector(`[data-filter="${initialKey}"]`);
-    if (initBtn) initBtn.classList.add("active");
+    // 行指定（あ/か/…/わ）の場合：その行だけ抽出
+    return sortedAll.filter(d => rowKeyForRecord(d) === key);
   }
+}
+
 
   // 表表示（Excel安全：純テキスト表。★ナビ兼フィルタに変更）
   function renderPlainTable(initialKey = "all") {
