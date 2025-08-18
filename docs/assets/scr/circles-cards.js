@@ -185,29 +185,25 @@
   /** カードDOMを1枚生成して返す（左: 画像 / 右: 情報） */
   function createCard(c) {
     const card = document.createElement("div");
-    card.className = "circle-card";
-
-    // 横並びを確実にする（最低限のinline-style）
-    card.style.display = "flex";
-    card.style.gap = "12px";
-    card.style.alignItems = "flex-start";
-
+    card.className = "circle-card";  // スタイルはCSSに集約
+  
     const thumb = c.thumb || c.cut || "assets/img/noimage.png";
     const snsHtml = buildSnsLinks(c.sns);
-
+  
     card.innerHTML = `
-      <div class="thumb" style="flex:0 0 auto;">
-        <img src="${thumb}" alt="" style="display:block;max-width:160px;height:auto;">
+      <div class="thumb">
+        <img src="${thumb}" alt="" />
       </div>
-      <div class="meta" style="flex:1 1 auto;">
+      <div class="meta">
         <div class="name">${c.name || ""}</div>
         <div class="space">${c.space || ""}</div>
         <div class="pn">${c.pn || ""}</div>
-        ${snsHtml ? `<div class="sns" style="display:flex;gap:8px;align-items:center;">${snsHtml}</div>` : ``}
+        ${snsHtml ? `<div class="sns">${snsHtml}</div>` : ``}
       </div>
     `;
     return card;
   }
+
 
   /** 「さらに読み込む」ボタンを取得（無ければ生成） */
   function ensureLoadMoreButton() {

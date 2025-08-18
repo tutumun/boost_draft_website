@@ -151,3 +151,63 @@ section { margin-bottom: var(--space-6); }
   a { text-decoration: none; color: #000; }
   section table, #circleList table { box-shadow: none; }
 }
+
+/* ================================
+   サークルカードのスタイル
+   ================================ */
+.circle-card {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  border: 1px solid #ccc;   /* 枠線 */
+  padding: 12px;            /* 内側余白 */
+  margin-bottom: 16px;      /* 下に余白 */
+  border-radius: 6px;       /* 角丸 */
+  background-color: #fff;   /* 背景色 */
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05); /* ほんのり影 */
+}
+
+/* サークルカット部分 */
+.circle-card .thumb img {
+  display: block;
+  max-width: 160px;
+  height: auto;
+  border-radius: 4px;  /* 画像も少し角丸に */
+}
+
+/* 右側の情報部分 */
+.circle-card .meta {
+  flex: 1 1 auto;
+}
+
+/* サークル名やスペース番号など */
+.circle-card .name {
+  font-weight: bold;
+  font-size: 1.1em;
+  margin-bottom: 4px;
+}
+
+.circle-card .space {
+  font-size: 0.95em;
+  color: #333;
+  margin-bottom: 2px;
+}
+
+.circle-card .pn {
+  font-size: 0.9em;
+  color: #555;
+  margin-bottom: 6px;
+}
+
+/* SNSアイコン部分 */
+.circle-card .sns {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.circle-card .sns img {
+  width: 20px;
+  height: 20px;
+  display: block;
+}
+
