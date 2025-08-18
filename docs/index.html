@@ -128,5 +128,97 @@
     <p>不明点はGitHub Issueフォームよりお問い合わせください。</p>
     <a href="https://github.com/tutumun/boost_draft_website/issues/new" target="_blank" rel="noopener" class="btn">問い合わせフォーム</a>
   </section>
+  <script>
+  (function () {
+    'use strict';
+
+    const FLYER_SRC = './assets/img/flyers/flyer-placeholder.png';
+    const FLYER_ALT = 'イベントフライヤー';
+
+    function injectStyle() {
+      const id = 'flyer-in-hero-style';
+      if (document.getElementById(id)) return;
+      const css = `
+        .hero-flex {
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          gap: 24px;
+        }
+        .hero-left {
+          flex: 0 0 auto;
+          max-width: 360px;
+        }
+        .hero-left .flyer-img {
+          display: block;
+          width: 100%;
+          height: auto;
+          border-radius: 12px;
+          box-shadow: 0 4px 16px rgba(0,0,0,.12);
+        }
+        .hero-right {
+          flex: 1 1 auto;
+          min-width: 0;
+        }
+        @media (max-width: 880px) {
+          .hero-flex { flex-direction: column; }
+          .hero-left { max-width: none; }
+        }
+      `;
+      const style = document.createElement('style');
+      style.id = id;
+      style.appendChild(document.createTextNode(css));
+      document.head.appendChild(style);
+    }
+
+    function getHeroRoot() {
+      return document.querySelector('header.hero') || document.querySelector('.hero');
+    }
+
+    function createFlyerImg() {
+      const img = document.createElement('img');
+      img.className = 'flyer-img';
+      img.src = FLYER_SRC;
+      img.alt = FLYER_ALT;
+      img.loading = 'lazy';
+      img.decoding = 'async';
+      return img;
+    }
+
+    function mountFlyer() {
+      const hero = getHeroRoot();
+      if (!hero) return;
+      if (hero.querySelector('.hero-flex')) return;
+
+      const left  = document.createElement('div');
+      left.className = 'hero-left';
+      left.appendChild(createFlyerImg());
+
+      const right = document.createElement('div');
+      right.className = 'hero-right';
+      const nodes = Array.from(hero.childNodes);
+      nodes.forEach(n => right.appendChild(n));
+
+      const wrap = document.createElement('div');
+      wrap.className = 'hero-flex';
+      wrap.appendChild(left);
+      wrap.appendChild(right);
+
+      hero.appendChild(wrap);
+    }
+
+    function onReady() {
+      injectStyle();
+      mountFlyer();
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', onReady);
+    } else {
+      onReady();
+    }
+  })();
+</script>
+
 </body>
 </html>
