@@ -12,28 +12,30 @@
    * - "A-01" と "A-1" は同値として扱う
    * - 想定外の文字列は最後に回す（元の文字列で比較）
    */
-  function compareSpaceStr(a, b) {
-    const pa = parseSpace(a);
-    const pb = parseSpace(b);
-
-    // どちらも正規にパースできた場合：ブロック→数値の順に比較
-    if (pa.valid && pb.valid) {
-      if (pa.block !== pb.block) {
-        // ブロックは文字比較（日本語も想定して localeCompare）
-        return pa.block.localeCompare(pb.block, "ja");
+  function compareSpace(a, b) {
+    // 正規表現：ブロック文字(A〜Z) + 数値（最初の数字だけ）
+    const regex = /^([A-Z]+)-?(\d+)/i;
+  
+    const ma = a.match(regex);
+    const mb = b.match(regex);
+  
+    if (ma && mb) {
+      const blockA = ma[1].toUpperCase();
+      const blockB = mb[1].toUpperCase();
+    
+      // ブロック(A, B, C …)比較
+      if (blockA !== blockB) {
+        return blockA.localeCompare(blockB, 'ja');
       }
-      // 同一ブロックなら数値昇順
-      if (pa.num !== pb.num) return pa.num - pb.num;
-      // 同値なら元文字列の長さ（ゼロパディング有無）で安定ソート
-      return a.length - b.length;
+    
+      // 最初の数値だけを比較
+      const numA = parseInt(ma[2], 10);
+      const numB = parseInt(mb[2], 10);
+      return numA - numB;
     }
-
-    // 片方だけ正規：正規にパースできた方を先に
-    if (pa.valid && !pb.valid) return -1;
-    if (!pa.valid && pb.valid) return 1;
-
-    // 両方とも非正規：素の文字列で比較（末尾に押しやる）
-    return (a || "").localeCompare(b || "", "ja");
+  
+    // 想定外は文字列比較
+    return a.localeCompare(b, 'ja');
   }
 
   /**
