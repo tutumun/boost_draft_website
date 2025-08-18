@@ -231,3 +231,14 @@ nav.site-nav,
   box-shadow: 0 2px 6px rgba(0,0,0,.06);
   border-bottom: 1px solid #eee;
 }
+
+#circleList table {
+  width: 100%;           /* 表をコンテナ幅いっぱいに広げる */
+  table-layout: fixed;   /* 各列の幅を均等に分配 */
+}
+
+#circleList th,
+#circleList td {
+  padding: 6px 10px;     /* セルの内側に余白を増やす（見やすさ用） */
+  word-wrap: break-word; /* 内容が長い場合は折り返す */
+}
