@@ -35,32 +35,14 @@
     return a.localeCompare(b, 'ja');
   }
 
-
-  /**
-   * スペース番号を { valid, block, num } に分解
-   * - ブロック: 先頭の英字（A, B, C...）を大文字化（"AA" など複数文字も許容）
-   * - 数値: 末尾の連続数字を10進で取得（先頭ゼロは無視）
-   * - 例: "A-01" → { valid:true, block:"A", num:1 }
-   *       "b12"  → { valid:true, block:"B", num:12 }
-   *       "企業-02" → { valid:false, ... } ※想定外は非正規
-   */
-  function parseSpace(s) {
-    if (!s) return { valid: false, block: "", num: Number.POSITIVE_INFINITY };
-    const str = String(s).trim();
-
-    // パターン1: 英字 + 任意のハイフン/空白 + 数字
-    //   例: "A-01", "A01", "AA-7"
-    const m = str.match(/^([A-Za-z]+)[\s\-]*?(\d+)$/);
-    if (m) {
-      return {
-        valid: true,
-        block: m[1].toUpperCase(),
-        num: parseInt(m[2], 10)
-      };
-    }
-
-    // パターン2: 先に数字、後ろにブロック等が付くなどは非対応 → 非正規
-    return { valid: false, block: "", num: Number.POSITIVE_INFINITY };
+  // ▼追加：かな順（kana優先）比較関数
+  // - CSVの kana 列があれば優先し、なければ name を利用
+  // - Intl.Collator('ja') で日本語の並び替えに最適化
+  function compareKana(a, b) {
+    const collator = new Intl.Collator('ja', { usage: 'sort', sensitivity: 'base', ignorePunctuation: true });
+    const ka = (a?.kana ?? a?.name ?? '').toString();
+    const kb = (b?.kana ?? b?.name ?? '').toString();
+    return collator.compare(ka, kb);
   }
 
   /** ユーティリティ：DOM取得の短縮 */
@@ -94,10 +76,10 @@
       });
     }
 
-    // 五十音順（サークル名）
+    // 五十音順（kana優先）
     if (btnKana) {
       btnKana.addEventListener("click", () => {
-        const sorted = [...getData()].sort((a, b) => (a.name || "").localeCompare(b.name || "", "ja"));
+        const sorted = [...getData()].sort((a, b) => compareKana(a, b));
         if (typeof window.renderCards === "function") {
           window.renderCards(sorted);
         }

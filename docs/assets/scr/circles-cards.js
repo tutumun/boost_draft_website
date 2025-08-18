@@ -107,13 +107,80 @@
     return card;
   }
 
-  function renderCards(data) {
-    const container = document.getElementById("circleList");
-    if (!container) return;
-    container.innerHTML = "";
+  // ===============================
+  // 変更点①: SNSリンク生成ロジックの追加
+  //  - 空欄は非表示
+  //  - 複数は " | " 区切り
+  //  - favicon 表示（Google S2 API, ドラフト用）
+  // ===============================
+  function faviconUrl(href) { // favicon取得ヘルパ
+    try {
+      const u = new URL(href);
+      return `https://www.google.com/s2/favicons?domain=${u.hostname}&sz=16`;
+    } catch { return ""; }
+  }
 
-    (data || []).forEach((item) => {
-      container.appendChild(buildCard(item));
+  function buildSnsLinks(snsString) {
+    // 入力が空・未定義なら空文字（= 表示なし）
+    if (!snsString) return "";
+
+    // 区切りは空白 / 縦棒 / カンマ を許容し、空要素は除外
+    const parts = String(snsString).split(/[\\s|,]+/).map(s => s.trim()).filter(Boolean);
+    if (parts.length === 0) return "";
+
+    // ラベル推定（ドメインから簡易判定）
+    const guessLabel = (href) => {
+      try {
+        const host = new URL(href).hostname;
+        if (host.includes("x.com") || host.includes("twitter.com")) return "X";
+        if (host.includes("instagram.com")) return "Instagram";
+        if (host.includes("youtube.com") || host.includes("youtu.be")) return "YouTube";
+        if (host.includes("tiktok.com")) return "TikTok";
+        if (host.includes("pixiv.net")) return "pixiv";
+        if (host.includes("booth.pm")) return "BOOTH";
+        if (host.includes("bsky.app")) return "Bluesky";
+        if (host.includes("threads.net")) return "Threads";
+        if (host.includes("note.com")) return "note";
+        return "Web";
+      } catch { return "Web"; }
+    };
+
+    const anchors = parts.map((href) => {
+      const label = guessLabel(href);
+      const ico = faviconUrl(href);
+      const iconImg = ico ? `<img src="${ico}" alt="" width="16" height="16" loading="lazy">` : "";
+      return `<a href="${href}" target="_blank" rel="noopener noreferrer">${iconImg}<span>${label}</span></a>`;
+    });
+
+    // 複数SNSは " | " で結合
+    return anchors.join(" | ");
+  }
+
+  // ===============================
+  // 変更点②: カードDOM生成でSNS表示を条件化
+  //  - 空欄ならSNS行を出力しない
+  //  - 生成は buildSnsLinks() に一本化
+  // ===============================
+  function renderCards(data) {
+    const container = document.getElementById("circle-cards");
+    container.innerHTML = "";
+    (data || []).forEach((c) => {
+      const card = document.createElement("div");
+      card.className = "circle-card";
+
+      // SNSリンクHTMLを事前生成（空なら非表示）
+      const snsHtml = buildSnsLinks(c.sns);
+
+      card.innerHTML = `
+        <div class="thumb"><img src="${c.thumb || "assets/img/noimage.png"}" alt=""></div>
+        <div class="meta">
+          <div class="name">${c.name || ""}</div>
+          <div class="space">${c.space || ""}</div>
+          <div class="pn">${c.pn || ""}</div>
+          ${snsHtml ? `<div class="sns">${snsHtml}</div>` : ``}
+        </div>
+      `;
+      container.appendChild(card);
     });
   }
 
