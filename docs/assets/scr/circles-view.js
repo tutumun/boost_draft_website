@@ -81,25 +81,38 @@
     return SMALL[ch] || ch;
   }
 
-  // レコード→行キー（"あ/か/さ/た/な/は/ま/や/ら/わ"）
-  function rowKeyForRecord(rec) {
-    const src = (rec?.kana || rec?.name || "").toString();
-    const ch = normalizeKanaHead(src);
-    const ROWS = {
-      "あ": ["あ","い","う","え","お"],
-      "か": ["か","き","く","け","こ"],
-      "さ": ["さ","し","す","せ","そ"],
-      "た": ["た","ち","つ","て","と"],
-      "な": ["な","に","ぬ","ね","の"],
-      "は": ["は","ひ","ふ","へ","ほ"],
-      "ま": ["ま","み","む","め","も"],
-      "や": ["や","ゆ","よ"],
-      "ら": ["ら","り","る","れ","ろ"],
-      "わ": ["わ","を","ん"]
-    };
-    for (const [row, chars] of Object.entries(ROWS)) if (chars.includes(ch)) return row;
-    return ""; // 判定できない
+// ▼修正：rowKeyForRecord をローマ字コード対応に
+// kana に a,k,s,t,n,h,m,y,r,w,kigyou が入っているケースを想定し、
+// a→あ行, k→か行… w→わ行, kigyou→"corp"（企業フィルタ用の特別キー）にマップする。
+// それ以外は従来どおり「先頭文字から行判定（かな優先, 名前フォールバック）」で対応。
+function rowKeyForRecord(rec) {
+  const kanaRaw = (rec?.kana ?? "").toString().trim().toLowerCase();
+  const romanMap = {
+    a: "あ", k: "か", s: "さ", t: "た", n: "な",
+    h: "は", m: "ま", y: "や", r: "ら", w: "わ",
+    kigyou: "corp" // 企業専用キー（ボタン側の data-filter="corp" と連動）
+  };
+  if (romanMap[kanaRaw]) return romanMap[kanaRaw];
+
+  // ▼ローマ字コードでなければ、従来の日本語先頭文字で判定
+  const ch = normalizeKanaHead((rec?.kana || rec?.name || "").toString());
+  const ROWS = {
+    "あ": ["あ","い","う","え","お"],
+    "か": ["か","き","く","け","こ"],
+    "さ": ["さ","し","す","せ","そ"],
+    "た": ["た","ち","つ","て","と"],
+    "な": ["な","に","ぬ","ね","の"],
+    "は": ["は","ひ","ふ","へ","ほ"],
+    "ま": ["ま","み","む","め","も"],
+    "や": ["や","ゆ","よ"],
+    "ら": ["ら","り","る","れ","ろ"],
+    "わ": ["わ","を","ん"]
+  };
+  for (const [row, chars] of Object.entries(ROWS)) {
+    if (chars.includes(ch)) return row;
   }
+  return ""; // 判定不能
+}
 
   // CAT/type（小文字）
   function getCatLower(d) {
