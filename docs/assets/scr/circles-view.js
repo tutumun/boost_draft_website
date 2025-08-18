@@ -247,52 +247,112 @@
   }
 
   // 表表示（Excel安全：純テキスト表。A/B/C/D/E・企業・すべてボタンは“非フィルタ”のナビ用）
+  // ▼ circles-view.js の renderPlainTable をこの版に差し替えてください
+  //   目的: 表の各列を 200px 固定にし、CSS ではなく JS 側で <colgroup> を用いて強制
+  //   ポイント:
+  //     - table に tableLayout: 'fixed'、width: 'auto' を指定
+  //     - <colgroup><col style="width:200px">×4 を挿入し、ブラウザの自動レイアウトに勝つ
+  //     - 既存の setSubControls / toggleLoadMore / getData / compareSpaceStr は既存の定義を利用
+  //
+  //   ※ circles-view.js 全体を置き換える必要はなく、この関数のみ差し替えればOK
+  //   ※ 将来、% 指定やレスポンシブ化に戻す際は widths 配列を書き換えるだけで対応可
+  
   function renderPlainTable() {
-    // サブボタン生成（押してもデータは変えない＝非フィルタ。将来はスクロール等に拡張可）
-    setSubControls(
-      `<div class="row-buttons" role="group" aria-label="表表示ナビ">
-        <button type="button" data-nav="A">A</button>
-        <button type="button" data-nav="B">B</button>
-        <button type="button" data-nav="C">C</button>
-        <button type="button" data-nav="D">D</button>
-        <button type="button" data-nav="E">E</button>
-        <button type="button" data-nav="corp">企業</button>
-        <button type="button" data-nav="all" class="active">すべて</button>
-      </div>`,
-      null,
-      "data-nav" // デリゲーションは行うが現状はノーオペ
-    );
-
-    // データを space 順で安定ソート
-    const sorted = [...getData()].sort((a, b) => compareSpaceStr(a.space || "", b.space || ""));
-
-    // 完全な表を出力（装飾HTMLは入れない）
-    const container = $("circleList");
+    // --- サブボタン（ナビのみ。データはフィルタしない現状仕様のまま） ---
+    if (typeof setSubControls === 'function') {
+      setSubControls(
+        `<div class="row-buttons" role="group" aria-label="表表示ナビ">
+          <button type="button" data-nav="A">A</button>
+          <button type="button" data-nav="B">B</button>
+          <button type="button" data-nav="C">C</button>
+          <button type="button" data-nav="D">D</button>
+          <button type="button" data-nav="E">E</button>
+          <button type="button" data-nav="corp">企業</button>
+          <button type="button" data-nav="all" class="active">すべて</button>
+        </div>`,
+        null,
+        'data-nav'
+      );
+    }
+  
+    // --- データをスペース順で安定ソート（既存の compareSpaceStr を利用） ---
+    const data = Array.isArray(window.circleData) ? window.circleData : [];
+    const sorted = [...data].sort((a, b) => (window.compareSpaceStr || ((x,y)=>String(x).localeCompare(String(y)) ))(a.space || '', b.space || ''));
+  
+    // --- DOM 取得 & クリア ---
+    const container = document.getElementById('circleList');
     if (!container) return;
-    container.innerHTML = "";
-
-    const table = document.createElement("table");
-    const thead = document.createElement("thead");
-    thead.innerHTML = "<tr><th>スペース</th><th>サークル名</th><th>PN</th><th>区分</th></tr>";
+    container.innerHTML = '';
+  
+    // --- テーブル生成 ---
+    const table = document.createElement('table');
+    table.style.tableLayout = 'fixed'; // 固定レイアウト: 列幅指定を優先
+    table.style.width = 'auto';        // 固定幅にしたいので auto（100%だと%優先されがち）
+    table.style.borderCollapse = 'collapse';
+  
+    // ★ ここが肝: <colgroup> で列幅を 200px 固定にする
+    const widths = ['200px', '200px', '200px', '200px'];
+    const colgroup = document.createElement('colgroup');
+    widths.forEach(w => {
+      const col = document.createElement('col');
+      col.style.width = w; // ブラウザ実装依存の差を超えて強制しやすい
+      colgroup.appendChild(col);
+    });
+    table.appendChild(colgroup);
+  
+    // --- thead ---
+    const thead = document.createElement('thead');
+    const trh = document.createElement('tr');
+    ['スペース', 'サークル名', 'PN', '区分'].forEach((txt, i) => {
+      const th = document.createElement('th');
+      th.textContent = txt;
+      // 念のためヘッダ側にも幅を指定（colgroupが効かない環境の保険）
+      th.style.width = widths[i];
+      trh.appendChild(th);
+    });
+    thead.appendChild(trh);
     table.appendChild(thead);
-
-    const tbody = document.createElement("tbody");
-    sorted.forEach((d) => {
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td>${d.space || ""}</td>
-        <td>${d.name || ""}</td>
-        <td>${d.pn || ""}</td>
-        <td>${d.cat || d.type || ""}</td>
-      `;
+  
+    // --- tbody ---
+    const tbody = document.createElement('tbody');
+    sorted.forEach(d => {
+      const tr = document.createElement('tr');
+    
+      // 1列目: スペース
+      const td1 = document.createElement('td');
+      td1.textContent = d.space || '';
+      td1.style.width = widths[0];
+      tr.appendChild(td1);
+    
+      // 2列目: サークル名
+      const td2 = document.createElement('td');
+      td2.textContent = d.name || '';
+      td2.style.width = widths[1];
+      tr.appendChild(td2);
+    
+      // 3列目: PN
+      const td3 = document.createElement('td');
+      td3.textContent = d.pn || '';
+      td3.style.width = widths[2];
+      tr.appendChild(td3);
+    
+      // 4列目: 区分（cat/type）
+      const td4 = document.createElement('td');
+      td4.textContent = d.cat || d.type || '';
+      td4.style.width = widths[3];
+      tr.appendChild(td4);
+    
       tbody.appendChild(tr);
     });
     table.appendChild(tbody);
+  
+    // --- 反映 ---
     container.appendChild(table);
-
+  
     // 表表示では「さらに読み込む」は不要
-    toggleLoadMore(false);
+    if (typeof toggleLoadMore === 'function') toggleLoadMore(false);
   }
+
   window.renderPlainTable = renderPlainTable; // 必要に応じて他所から呼べるよう公開
 
   /* =========================
