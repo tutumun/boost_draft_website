@@ -1,41 +1,34 @@
-// circles-view.js（全面改定版）
+// circles-view.js（修正版・安定版）
 // 目的：
-//  - 50音表示／スペース順表示／表表示 の3モードを提供
-//  - 表表示（プレーンテーブル）の列幅を JS 側で「確実に」制御（<colgroup>＋style直指定）
-//  - 列幅や合計幅をグローバル設定から「微調整」できるAPIを提供
-//  - ボタン要件：
-//      * 50音表示 … 「あ/か/さ/た/な/は/ま/や/ら/わ」「企業」「すべて」 ←（★追加）
-//      * スペース順表示 … 「A/B/C/D/E」「企業」「委託」「すべて」 ←（★追加）
-//      * 表表示 … 「A/B/C/D/E」「企業」「すべて」（ナビ兼フィルタに変更） ←（★仕様変更）
-//  - 「さらに読み込む」(#loadMoreCircles) はカード表示のみ。フィルタ後の件数が20件以下なら非表示。
-//  - 比較関数 compareKana / compareSpaceStr は window に公開（他JSでも利用可）
+//  - デフォルト表示を「CSVのspace列の有無」で切替（spaceあり→サークル順A／全空→五十音あ）
+//  - スペース順ボタンが反応しない不具合を解消（renderSpaceViewを追加／初期化を一本化）
+//  - 表表示は<colgroup>＋style直指定で列幅を確実に制御し、微調整APIも提供
+//  - 50音「すべて」時は一般→企業→委託の順で結合
+//  - コメント多め。既存のrenderCards()はそのまま利用
 
 (() => {
   "use strict";
 
   /* =========================
-   * グローバル設定（微調整用）
+   * グローバル設定（表の列幅 微調整用）
    * ========================= */
-  // 表（プレーンテーブル）の列幅（px）とテーブル幅の制御を一元管理
   const defaultTableConfig = {
-    // 列幅： [スペース, サークル名, PN, 区分]（px）
+    // 列幅（px）：[スペース, サークル名, PN, 区分]
     widths: [160, 200, 200, 150],
-    // 合計幅を「widthsの合計」に固定するか（true 推奨）
+    // true: 総幅＝列幅合計で固定
     forceTotalWidthBySum: true,
-    // 明示的にテーブル総幅を固定したい場合は数値を指定（px）。nullなら widths 合計を利用
+    // 数値指定で総幅を明示固定したい場合（nullなら列幅合計）
     explicitTotalWidth: null,
-    // コンテナ側（#circleList）の最大幅（px）。null ならCSS任せ
+    // #circleList の最大幅（px）。nullでCSS任せ
     containerMaxWidth: 1360
   };
-
-  // window からも触れるように公開（微調整しやすい）
+  // ウィンドウからも編集できる可変設定
   window.circleTableConfig = window.circleTableConfig || { ...defaultTableConfig };
 
-  // 簡易API：開発コンソールから即時反映できるよう公開
+  // デベロッパ向け簡易API（コンソールから即反映）
   window.setTableWidths = (arr) => {
     if (Array.isArray(arr) && arr.length === 4 && arr.every(n => Number.isFinite(n))) {
       window.circleTableConfig.widths = arr.map(n => Math.max(40, Math.floor(n))); // 最小40px保護
-      // 再描画（現在が表表示なら即時反映）
       if (window.__currentView === "table") renderPlainTable(window.__currentFilterKey || "all");
     }
   };
@@ -62,7 +55,6 @@
   /** データ取得（未ロード時は空配列） */
   const getData = () => Array.isArray(window.circleData) ? window.circleData : [];
 
-  
   /** circleData の到着を待つ（最大 5 秒） */
   function waitForData(timeoutMs = 5000) {
     if (getData().length > 0) return Promise.resolve(getData());
@@ -77,13 +69,13 @@
     });
   }
 
-  /** 「さらに読み込む」ボタンの表示切替（cards 側が生成する #loadMoreCircles を制御） */
+  /** 「さらに読み込む」ボタン表示切替（カード表示用） */
   function toggleLoadMore(show) {
     const btn = document.getElementById("loadMoreCircles");
     if (btn) btn.style.display = show ? "block" : "none";
   }
 
-  /** サブボタンコンテナを #viewControls の直下に常に配置 */
+  /** サブボタンコンテナを #viewControls の直下に配置（無ければ近傍に作成） */
   function ensureSubControls() {
     const controls = $("viewControls");
     let sub = $("subControls");
@@ -114,9 +106,9 @@
     const kb = (b?.kana ?? b?.name ?? "").toString();
     return collator.compare(ka, kb);
   }
-  window.compareKana = compareKana; // 他JSからも利用可能に公開
+  window.compareKana = compareKana;
 
-  /** スペース：Aブロック→数値（最初の数値のみ） */
+  /** スペース：Aブロック→数値（先頭の数値のみ） */
   function compareSpaceStr(a, b) {
     const regex = /^([A-Z]+)-?(\d+)/i;
     const sa = String(a || ""), sb = String(b || "");
@@ -131,22 +123,17 @@
   window.compareSpaceStr = window.compareSpaceStr || compareSpaceStr;
 
   /* =========================
-   * かな行判定（ローマ字 a/k/s/... 対応）
+   * かな行判定（ローマ字 a/k/s/... にも対応）
    * ========================= */
 
-  /**
-   * レコード → 行キー（"あ/か/さ/た/な/は/ま/や/ら/わ"）
-   * - CAT（企業/委託 など）はここでは扱わない（企業は専用ボタンで cat を優先）
-   * - kana がローマ字 1 文字 (a,k,s,t,n,h,m,y,r,w) の場合、それぞれ該当行にマップ
-   * - 上記以外は従来どおり、日本語の先頭文字から行判定（フォールバック）
-   */
+  /** レコード → 行キー（"あ/か/さ/た/な/は/ま/や/ら/わ"） */
   function rowKeyForRecord(rec) {
     const kanaRaw = (rec?.kana ?? "").toString().trim().toLowerCase();
-    // ローマ字 1 文字 → 行キー
+    // ローマ字1文字 → 行キー
     const romanMap = { a: "あ", k: "か", s: "さ", t: "た", n: "な", h: "は", m: "ま", y: "や", r: "ら", w: "わ" };
     if (romanMap[kanaRaw]) return romanMap[kanaRaw];
 
-    // ここからは従来の日本語先頭文字からの判定
+    // 日本語先頭文字からの判定（ひらがな正規化）
     const ch = normalizeKanaHead((rec?.kana || rec?.name || "").toString());
     const ROWS = {
       "あ": ["あ","い","う","え","お"],
@@ -163,7 +150,7 @@
     for (const [row, chars] of Object.entries(ROWS)) {
       if (chars.includes(ch)) return row;
     }
-    return ""; // 判定不能
+    return "";
   }
 
   /** 先頭1文字を “基底ひらがな” に正規化（濁点/半濁点/小書き/カタカナ対応） */
@@ -173,7 +160,8 @@
     if (!s) return "";
     let ch = s.charAt(0).normalize("NFKC").normalize("NFKD").replace(/\p{M}+/gu, "");
     const code = ch.charCodeAt(0);
-    if (code >= 0x30A1 && code <= 0x30FA) ch = String.fromCharCode(code - 0x60); // カタカナ→ひらがな
+    // カタカナ→ひらがな
+    if (code >= 0x30A1 && code <= 0x30FA) ch = String.fromCharCode(code - 0x60);
     const SMALL = { "ぁ":"あ","ぃ":"い","ぅ":"う","ぇ":"え","ぉ":"お","っ":"つ","ゃ":"や","ゅ":"ゆ","ょ":"よ","ゎ":"わ" };
     return SMALL[ch] || ch;
   }
@@ -197,7 +185,7 @@
       if (!target) return;
       const key = target.getAttribute(datasetKey);
       onClick?.(key);
-      // active 表示
+      // active 表示の付替え
       [...sub.querySelectorAll(sel)].forEach(btn => btn.classList.toggle("active", btn === target));
     };
   }
@@ -206,87 +194,126 @@
    * 各表示モード
    * ========================= */
 
-  // 五十音表示（カード）—「すべて」選択時の並びを修正
-// 仕様：あ→か→さ→た→な→は→ま→や→ら→わ の順で結合し、
-//       「企業」「委託」は最後にまとめて（一般の後ろに）付ける。
-function renderKanaView(initialKey = "あ") {
-  window.__currentView = "kana";
-  window.__currentFilterKey = initialKey;
+  // 50音表示（カード）
+  // 「すべて」時：一般（企業/委託以外）を あ→…→わ で結合し、その後ろに 企業→委託 をまとめる
+  function renderKanaView(initialKey = "あ") {
+    window.__currentView = "kana";
+    window.__currentFilterKey = initialKey;
 
-  // 全データを50音順でソート（レコード同士の比較は compareKana）
-  const baseAll = [...getData()].sort(compareKana);
+    const baseAll = [...getData()].sort(compareKana);
+    const rows = ["あ","か","さ","た","な","は","ま","や","ら","わ"];
 
-  // 行ボタン
-  const rows = ["あ","か","さ","た","な","は","ま","や","ら","わ"];
-
-  // サブボタン生成：「すべて」を含む（企業ボタンもあり）
-  setSubControls(
-    `<div class="row-buttons" role="group" aria-label="50音行フィルタ">
-      ${rows.map(r => `<button type="button" data-filter="${r}">${r}</button>`).join("")}
-      <button type="button" data-filter="corp">企業</button>
-      <button type="button" data-filter="all">すべて</button>
-    </div>`,
-    (key) => {
-      window.__currentFilterKey = key;
-      const viewData = buildKanaViewData(baseAll, key); // ★ 下のヘルパで構築
-      if (typeof window.renderCards === "function") {
-        window.renderCards(viewData);
-        toggleLoadMore(viewData.length > 20);
+    setSubControls(
+      `<div class="row-buttons" role="group" aria-label="50音行フィルタ">
+        ${rows.map(r => `<button type="button" data-filter="${r}">${r}</button>`).join("")}
+        <button type="button" data-filter="corp">企業</button>
+        <button type="button" data-filter="all">すべて</button>
+      </div>`,
+      (key) => {
+        window.__currentFilterKey = key;
+        const viewData = buildKanaViewData(baseAll, key);
+        if (typeof window.renderCards === "function") {
+          window.renderCards(viewData);
+          toggleLoadMore(viewData.length > 20);
+        }
       }
-    }
-  );
+    );
 
-  // 初回描画
-  const firstData = buildKanaViewData(baseAll, initialKey);
-  if (typeof window.renderCards === "function") {
-    window.renderCards(firstData);
-    toggleLoadMore(firstData.length > 20);
+    // 初回描画
+    const firstData = buildKanaViewData(baseAll, initialKey);
+    if (typeof window.renderCards === "function") {
+      window.renderCards(firstData);
+      toggleLoadMore(firstData.length > 20);
+    }
+
+    // active 初期付与
+    const sub = $("subControls") || ensureSubControls();
+    const initBtn = sub.querySelector(`[data-filter="${initialKey}"]`);
+    if (initBtn) initBtn.classList.add("active");
+
+    function buildKanaViewData(sortedAll, key) {
+      const isCorp  = (d) => getCatLower(d) === "企業";
+      const isItaku = (d) => getCatLower(d) === "委託";
+
+      if (key === "corp") return sortedAll.filter(isCorp);
+      if (key === "all") {
+        const general = sortedAll.filter(d => !isCorp(d) && !isItaku(d));
+        let mergedGeneral = [];
+        rows.forEach(r => {
+          mergedGeneral = mergedGeneral.concat(general.filter(d => rowKeyForRecord(d) === r));
+        });
+        const corp  = sortedAll.filter(isCorp);
+        const itaku = sortedAll.filter(isItaku);
+        return mergedGeneral.concat(corp, itaku);
+      }
+      return sortedAll.filter(d => rowKeyForRecord(d) === key);
+    }
   }
 
-  // active 表示
-  const sub = (document.getElementById("subControls")) || ensureSubControls();
-  const initBtn = sub.querySelector(`[data-filter="${initialKey}"]`);
-  if (initBtn) initBtn.classList.add("active");
+  // スペース順表示（カード）★不足していたため追加
+  function renderSpaceView(initialKey = "A") {
+    window.__currentView = "space";
+    window.__currentFilterKey = initialKey;
 
-  /**
-   * 「すべて」時は 50音行順で一般 → 企業 → 委託 の順に結合
-   * 通常の行指定時は該当行のみ、企業指定は cat=企業 のみ。
-   */
-  function buildKanaViewData(sortedAll, key) {
-    // cat 判定（小文字化済みで比較）
-    const isCorp   = (d) => getCatLower(d) === "企業";
-    const isItaku  = (d) => getCatLower(d) === "委託";
+    const base = [...getData()].sort((a, b) => compareSpaceStr(a.space || "", b.space || ""));
+    const letters = ["A","B","C","D","E"];
 
-    if (key === "corp") {
-      // 企業のみ
-      return sortedAll.filter(isCorp);
+    setSubControls(
+      `<div class="row-buttons" role="group" aria-label="スペース行フィルタ">
+        ${letters.map(L => `<button type="button" data-filter="${L}">${L}</button>`).join("")}
+        <button type="button" data-filter="corp">企業</button>
+        <button type="button" data-filter="itaku">委託</button>
+        <button type="button" data-filter="all">すべて</button>
+      </div>`,
+      (key) => {
+        window.__currentFilterKey = key;
+        let data = base;
+        if (key === "corp") {
+          const hasCat = data.some(d => (d.cat ?? d.type ?? "").trim() !== "");
+          data = hasCat ? data.filter(d => getCatLower(d) === "企業") : [];
+        } else if (key === "itaku") {
+          const hasCat = data.some(d => (d.cat ?? d.type ?? "").trim() !== "");
+          data = hasCat ? data.filter(d => getCatLower(d) === "委託") : [];
+        } else if (key === "all") {
+          // 全件
+        } else {
+          const re = new RegExp(`^${key}`, "i");
+          data = data.filter(d => re.test(String(d.space || "")));
+        }
+        if (typeof window.renderCards === "function") {
+          window.renderCards(data);
+          toggleLoadMore(data.length > 20);
+        }
+      }
+    );
+
+    // 初回描画
+    let first = base;
+    if (initialKey === "corp") {
+      const hasCat = base.some(d => (d.cat ?? d.type ?? "").trim() !== "");
+      first = hasCat ? base.filter(d => getCatLower(d) === "企業") : [];
+    } else if (initialKey === "itaku") {
+      const hasCat = base.some(d => (d.cat ?? d.type ?? "").trim() !== "");
+      first = hasCat ? base.filter(d => getCatLower(d) === "委託") : [];
+    } else if (initialKey !== "all") {
+      const reInit = new RegExp(`^${initialKey}`, "i");
+      first = base.filter(d => reInit.test(String(d.space || "")));
     }
-    if (key === "all") {
-      // 1) 一般（企業・委託を除く）を 50音行順で連結
-      const general = sortedAll.filter(d => !isCorp(d) && !isItaku(d));
-      let mergedGeneral = [];
-      rows.forEach(r => {
-        // 行キー一致のものを順に追加
-        const part = general.filter(d => rowKeyForRecord(d) === r);
-        mergedGeneral = mergedGeneral.concat(part);
-      });
-      // 2) 企業・委託を最後にまとめて付ける（並びは元の compareKana 順）
-      const corp  = sortedAll.filter(isCorp);
-      const itaku = sortedAll.filter(isItaku);
-      return mergedGeneral.concat(corp, itaku);
+    if (typeof window.renderCards === "function") {
+      window.renderCards(first);
+      toggleLoadMore(first.length > 20);
     }
-    // 行指定（あ/か/…/わ）の場合：その行だけ抽出
-    return sortedAll.filter(d => rowKeyForRecord(d) === key);
+    const sub = $("subControls") || ensureSubControls();
+    const initBtn = sub.querySelector(`[data-filter="${initialKey}"]`);
+    if (initBtn) initBtn.classList.add("active");
   }
-}
 
-
-  // 表表示（Excel安全：純テキスト表。★ナビ兼フィルタに変更）
+  // 表表示（プレーンテーブル）
   function renderPlainTable(initialKey = "all") {
     window.__currentView = "table";
     window.__currentFilterKey = initialKey;
 
-    // ▼ サブボタン生成（押すとフィルタして再描画）
+    // サブボタン（フィルタ兼用）
     setSubControls(
       `<div class="row-buttons" role="group" aria-label="表表示フィルタ">
         <button type="button" data-filter="A">A</button>
@@ -297,14 +324,14 @@ function renderKanaView(initialKey = "あ") {
         <button type="button" data-filter="corp">企業</button>
         <button type="button" data-filter="all" class="active">すべて</button>
       </div>`,
-      (key) => renderPlainTable(key), // 自身を呼び直して反映
+      (key) => renderPlainTable(key),
       "data-filter"
     );
 
-    // ▼ データを base に（スペース順で安定ソート）
+    // スペース順で安定ソート
     const base = [...getData()].sort((a, b) => compareSpaceStr(a.space || "", b.space || ""));
 
-    // ▼ フィルタ適用
+    // フィルタ適用
     let data = base;
     if (initialKey === "corp") {
       const hasCat = base.some(d => (d.cat ?? d.type ?? "").trim() !== "");
@@ -312,14 +339,12 @@ function renderKanaView(initialKey = "あ") {
     } else if (["A","B","C","D","E"].includes(initialKey)) {
       const re = new RegExp(`^${initialKey}`, "i");
       data = base.filter(d => re.test(String(d.space || "")));
-    } // "all" は全件
+    }
 
-    // ▼ コンテナ
+    // テーブル描画
     const container = $("circleList");
     if (!container) return;
     container.innerHTML = "";
-
-    // 横スクロールの強制（はみ出し時）
     container.style.overflowX = "auto";
     container.style.webkitOverflowScrolling = "touch";
     if (Number.isFinite(window.circleTableConfig.containerMaxWidth)) {
@@ -330,25 +355,20 @@ function renderKanaView(initialKey = "あ") {
       container.style.paddingRight = "12px";
     }
 
-    // ▼ 設定読込
     const cfg = window.circleTableConfig;
     const COLS = (cfg?.widths && cfg.widths.length === 4) ? cfg.widths : defaultTableConfig.widths;
     const sum = COLS.reduce((a,b)=>a+b, 0);
     const totalWidth = (cfg.explicitTotalWidth != null)
       ? cfg.explicitTotalWidth
-      : (cfg.forceTotalWidthBySum ? sum : sum); // 現状は合計優先
+      : (cfg.forceTotalWidthBySum ? sum : sum);
 
-    // ▼ テーブル生成
     const table = document.createElement("table");
     table.style.tableLayout = "fixed";
     table.style.borderCollapse = "collapse";
-
-    // 総幅固定
     table.style.width = `${totalWidth}px`;
     table.style.minWidth = `${totalWidth}px`;
     table.style.maxWidth = `${totalWidth}px`;
 
-    // 列幅を colgroup で宣言（最優先）
     const colgroup = document.createElement("colgroup");
     COLS.forEach((w) => {
       const col = document.createElement("col");
@@ -360,7 +380,6 @@ function renderKanaView(initialKey = "あ") {
     });
     table.appendChild(colgroup);
 
-    // thead
     const thead = document.createElement("thead");
     const trh = document.createElement("tr");
     ["スペース", "サークル名", "PN", "区分"].forEach((txt, i) => {
@@ -380,7 +399,6 @@ function renderKanaView(initialKey = "あ") {
     thead.appendChild(trh);
     table.appendChild(thead);
 
-    // tbody
     const tbody = document.createElement("tbody");
     data.forEach((d) => {
       const tr = document.createElement("tr");
@@ -407,83 +425,55 @@ function renderKanaView(initialKey = "あ") {
     });
     table.appendChild(tbody);
 
-    // 反映
     container.appendChild(table);
-
-    // 表表示では「さらに読み込む」は不要
     toggleLoadMore(false);
 
-    // デバッグログ（必要なければ削除OK）
     console.log(`[renderPlainTable] key=${initialKey}, colWidths=${COLS.join(",")}, total=${totalWidth}px`);
   }
-  window.renderPlainTable = renderPlainTable; // 他所からも呼べるよう公開
+  window.renderPlainTable = renderPlainTable;
 
   /* =========================
-   * 初期化
+   * 初期化（一本化）
    * ========================= */
-  document.addEventListener("DOMContentLoaded", async () => {
-    const btnKana  = $("sortKana");
-    const btnSpace = $("sortSpace");
-    const btnTable = $("viewTable");
 
-    await waitForData();
-    renderKanaView("あ"); // デフォルト：50音表示（“あ” 行）
-
-    if (btnKana)  btnKana.addEventListener("click", () => renderKanaView("あ"));
-    if (btnSpace) btnSpace.addEventListener("click", () => renderSpaceView("A"));
-    if (btnTable) btnTable.addEventListener("click", () => renderPlainTable("all"));
-  });
-  /**
-   * 初期表示の選択：
-   * - CSV に space が 1 件でも入っていれば「サークル順(A)」
-   * - 全件空欄（または列なし）の場合は「五十音(あ)」
-   */
+  /** デフォルト表示：space有→サークル順A／全空→五十音あ */
   function initView() {
     try {
-      const data = getData(); // 既存ヘルパ（存在しない場合は Array を返す実装にしてください）
+      const data = getData();
       const hasSpace = Array.isArray(data) && data.some(d => (d?.space ?? "").toString().trim() !== "");
-
       if (hasSpace) {
-        // ★ 要望どおりデフォルトはサークル順（A）に変更
         renderSpaceView("A");
+        console.log("[init] default = Space(A)");
       } else {
-        // ★ space が全て空欄なら五十音（あ）
         renderKanaView("あ");
+        console.log("[init] default = Kana(あ)");
       }
     } catch (e) {
       console.error("[initView] error:", e);
-      // フォールバック（何かあっても五十音で出す）
-      renderKanaView("あ");
+      renderKanaView("あ"); // フォールバック
     }
   }
 
-  // DOM 準備完了後にデータ待ち → 初期描画 → トップの切替ボタンにイベントを付与
+  // DOMContentLoadedハンドラは一つに集約（※重複定義による競合を避ける）
   document.addEventListener("DOMContentLoaded", async () => {
     try {
-      // circleData の到着を待機（既存の waitForData を利用）
-      if (typeof waitForData === "function") {
-        await waitForData();
-      }
+      await waitForData();   // データ到着待ち
+      initView();            // デフォルト描画
 
-      // 初期描画（space 有無で切替）
-      initView();
-
-      // ▼ 上部タブ（想定ID）
-      const btnKana  = document.getElementById("sortKana");
-      const btnSpace = document.getElementById("sortSpace");
-      const btnTable = document.getElementById("viewTable");
-
-      // クリックで各ビューへ（初期キーは要望どおり）
+      // 上部タブのバインド（重複バインド回避のため addEventListener 一回）
+      const btnKana  = $("sortKana");
+      const btnSpace = $("sortSpace");
+      const btnTable = $("viewTable");
       if (btnKana)  btnKana.addEventListener("click", () => renderKanaView("あ"));
       if (btnSpace) btnSpace.addEventListener("click", () => renderSpaceView("A"));
       if (btnTable) btnTable.addEventListener("click", () => renderPlainTable("all"));
     } catch (e) {
       console.error("[DOMContentLoaded] init failed:", e);
+      renderKanaView("あ");
     }
   });
 
-  
-  // ▼ グローバル公開（HTML 側が inline onclick を使っていても動作するように）
+  // グローバル公開（inline onclick対策）
   window.renderKanaView   = window.renderKanaView   || renderKanaView;
   window.renderSpaceView  = window.renderSpaceView  || renderSpaceView;
   window.renderPlainTable = window.renderPlainTable || renderPlainTable;
