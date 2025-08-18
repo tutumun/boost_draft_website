@@ -1,38 +1,128 @@
 // circles-cards.js
-// サークルカード描画（SNSリンク表示対応）
-// - 変更点A: コンテナIDを #circleList に統一
-// - 変更点B: SNSは「文字列 or オブジェクト」の両方に対応、空欄非表示・複数は " | " 区切り
-// - 変更点C: 画像キーは thumb/cut の両対応（無ければ noimage.png）
+// サークル一覧の「カード描画」と「CSVロード」を担当
+// 変更点まとめ：
+// - CSVパスのフォールバック対応（content/circle-list.csv → data/circles.csv → content/circles.csv）
+// - CSVフォーマット両対応（旧12列: name,pn,space,type,cut,x,... / 新7列: name,pn,space,cat,thumb,kana,sns）
+// - SNSは「オブジェクト or 文字列」に両対応、空欄は非表示、複数は " | " 区切り
+// - 画像は thumb/cut の両対応（無い場合は noimage.png）
+// - 初期描画は #circleList にカードを展開、window.circleData を保持
 
 (() => {
   "use strict";
 
-  /** favicon 取得（ドラフトは Google S2 を利用） */
-  function faviconUrl(href) {
-    try {
-      const u = new URL(href);
-      return `https://www.google.com/s2/favicons?domain=${u.hostname}&sz=16`;
-    } catch {
-      return "";
+  /** 指定パス群から最初に成功するテキストを取得 */
+  async function fetchTextWithFallback(paths) {
+    let lastErr;
+    for (const p of paths) {
+      try {
+        const res = await fetch(p, { cache: "no-store" });
+        if (!res.ok) throw new Error(`${p}: HTTP ${res.status}`);
+        return await res.text();
+      } catch (e) {
+        lastErr = e;
+        // 次の候補へ
+      }
     }
+    throw lastErr ?? new Error("No CSV source found");
   }
 
-  /** SNSラベル推定（ホスト or キー名から簡易判定） */
+  /** 旧12列CSV → 行配列からオブジェクトへ変換 */
+  function mapOld12(cells) {
+    // 期待順: name, pn, space, type, cut, x, pixiv, booth, web, instagram, bluesky, tumblr
+    const [
+      name = "", pn = "", space = "", type = "",
+      cut = "", x = "", pixiv = "", booth = "",
+      web = "", instagram = "", bluesky = "", tumblr = ""
+    ] = cells.map(s => s?.trim() ?? "");
+    return {
+      name, pn, space,
+      cat: type,                 // 新式のcatに寄せる
+      cut, thumb: cut,           // 両対応
+      kana: "",                  // 旧式には列が無い
+      sns: { x, pixiv, booth, web, instagram, bluesky, tumblr }
+    };
+  }
+
+  /** 新7列CSV → 行配列からオブジェクトへ変換 */
+  function mapNew7(cells) {
+    // 期待順: name, pn, space, cat, thumb, kana, sns
+    const [
+      name = "", pn = "", space = "", cat = "",
+      thumb = "", kana = "", sns = ""
+    ] = cells.map(s => s?.trim() ?? "");
+    return { name, pn, space, cat, thumb, kana, sns };
+  }
+
+  /** 1行テキスト → セル配列（簡易CSV。ダブルクォート対応の軽処理） */
+  function splitCsvLine(line) {
+    // ざっくりなCSV分割（ダブルクォート内のカンマは保護）
+    const out = [];
+    let cur = "", inQ = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"') {
+        // 連続する "" はエスケープとして扱う
+        if (inQ && line[i + 1] === '"') { cur += '"'; i++; }
+        else { inQ = !inQ; }
+      } else if (ch === "," && !inQ) {
+        out.push(cur); cur = "";
+      } else {
+        cur += ch;
+      }
+    }
+    out.push(cur);
+    return out.map(s => s.trim());
+  }
+
+  /** CSVテキスト → サークル配列（旧/新どちらも処理） */
+  function parseCirclesCsv(text) {
+    const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    if (lines.length === 0) return [];
+
+    // ヘッダ行判定：先頭行に name,space などのキーワードが含まれていたらヘッダとみなす
+    const firstCells = splitCsvLine(lines[0]).map(s => s.toLowerCase());
+    const hasHeader = firstCells.some(s => ["name","space","sns","cat","type","thumb","cut","kana","pn"].includes(s));
+
+    const start = hasHeader ? 1 : 0;
+    const out = [];
+
+    for (let i = start; i < lines.length; i++) {
+      const cells = splitCsvLine(lines[i]);
+
+      // 列数で旧/新のどちらかを推定（旧: >=12, 新: >=7）
+      let row;
+      if (cells.length >= 12) {
+        row = mapOld12(cells);
+      } else {
+        row = mapNew7(cells);
+      }
+      out.push(row);
+    }
+    return out;
+  }
+
+  /** favicon URL（ドラフトでは Google S2 を利用） */
+  function faviconUrl(href, size = 16) {
+    try {
+      const u = new URL(href);
+      return `https://www.google.com/s2/favicons?domain=${u.hostname}&sz=${size}`;
+    } catch { return ""; }
+  }
+
+  /** SNSラベル推定（キー名 or URLドメインから簡易判定） */
   function guessLabel(hrefOrKey) {
     const key = String(hrefOrKey).toLowerCase();
-    // キー名での推定（オブジェクト入力用）
-    if (/(^|[^a-z])(x|twitter)([^a-z]|$)/.test(key)) return "X";
-    if (/instagram|ig/.test(key)) return "Instagram";
-    if (/youtube|yt/.test(key)) return "YouTube";
+    if (/(^|\\b)(x|twitter)(\\b|$)/.test(key)) return "X";
+    if (/instagram|\\big\\b/.test(key)) return "Instagram";
+    if (/youtube|\\byt\\b/.test(key)) return "YouTube";
     if (/tiktok/.test(key)) return "TikTok";
     if (/pixiv/.test(key)) return "pixiv";
     if (/booth/.test(key)) return "BOOTH";
-    if (/bluesky|bsky/.test(key)) return "Bluesky";
+    if (/bluesky|\\bbsky\\b/.test(key)) return "Bluesky";
     if (/threads/.test(key)) return "Threads";
     if (/note/.test(key)) return "note";
     if (/web|site|homepage|url/.test(key)) return "Web";
 
-    // URLでの推定（文字列入力用）
     try {
       const host = new URL(hrefOrKey).hostname;
       if (host.includes("x.com") || host.includes("twitter.com")) return "X";
@@ -49,53 +139,40 @@
   }
 
   /**
-   * SNSリンクHTMLを生成
-   * - 入力: 文字列（空白/|/カンマ区切り） または { key: url } オブジェクト
-   * - 振る舞い: 空欄は除外、複数は " | " 結合、favicon付きアンカーを返す
-   * - 戻り: HTML文字列（空なら ""）
+   * SNSリンクHTML生成
+   * - 入力: 文字列（空白/|/, 区切り） or { key: url } オブジェクト
+   * - 空欄は除外、複数は " | " で結合、favicon 付与
    */
   function buildSnsLinks(sns) {
-    // 1) null/undefined/空文字 → 非表示
     if (sns == null || sns === "") return "";
 
     let pairs = [];
-
-    // 2) オブジェクト形式 { x: "https://...", instagram: "" ... }
     if (typeof sns === "object" && !Array.isArray(sns)) {
+      // { key: url } 形式
       for (const [k, v] of Object.entries(sns)) {
         if (typeof v === "string" && v.trim() !== "") {
           pairs.push([k, v.trim()]);
         }
       }
-    }
-    // 3) 文字列形式 "https://... | https://..."（空白/|/, 区切りを許容）
-    else if (typeof sns === "string") {
-      const parts = sns.split(/[\s|,]+/).map(s => s.trim()).filter(Boolean);
+    } else if (typeof sns === "string") {
+      // "https://... | https://..." 形式（空白/|/, 区切り）
+      const parts = sns.split(/[\\s|,]+/).map(s => s.trim()).filter(Boolean);
       pairs = parts.map(href => [href, href]);
     }
 
     if (pairs.length === 0) return "";
 
-    // 4) aタグ列を生成
-    const anchors = pairs.map(([labelOrHref, href]) => {
+    return pairs.map(([labelOrHref, href]) => {
       const label = guessLabel(labelOrHref);
       const ico = faviconUrl(href);
       const iconImg = ico ? `<img src="${ico}" alt="" width="16" height="16" loading="lazy">` : "";
       return `<a href="${href}" target="_blank" rel="noopener noreferrer">${iconImg}<span>${label}</span></a>`;
-    });
-
-    // 5) " | " で結合して返す
-    return anchors.join(" | ");
+    }).join(" | ");
   }
 
-  /**
-   * カード描画
-   * - コンテナは #circleList（従来の構造に合わせる）
-   * - 画像は thumb/cut の順で優先、無ければ noimage.png
-   * - SNS は空なら非表示
-   */
+  /** カード描画（#circleList に出力） */
   function renderCards(data) {
-    const container = document.getElementById("circleList"); // 変更点A: #circleList を使用
+    const container = document.getElementById("circleList");
     if (!container) return;
     container.innerHTML = "";
 
@@ -103,8 +180,8 @@
       const card = document.createElement("div");
       card.className = "circle-card";
 
-      const thumb = c.thumb || c.cut || "assets/img/noimage.png"; // 変更点C
-      const snsHtml = buildSnsLinks(c.sns); // 変更点B
+      const thumb = c.thumb || c.cut || "assets/img/noimage.png";
+      const snsHtml = buildSnsLinks(c.sns);
 
       card.innerHTML = `
         <div class="thumb"><img src="${thumb}" alt=""></div>
@@ -119,6 +196,30 @@
     });
   }
 
-  // グローバル公開（他JSから呼び出す）
+  /** CSVロード（GitHub基本構成に従い content/circle-list.csv を使用） */
+  async function loadCircles() {
+    try {
+      const text = await fetch("content/circle-list.csv", { cache: "no-store" })
+        .then(res => {
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          return res.text();
+        });
+      const data = parseCirclesCsv(text);
+      return data;
+    } catch (err) {
+      console.warn("CSVの読み込みに失敗しました:", err);
+      return [];
+    }
+  }
+
+
+  // グローバル公開
   window.renderCards = renderCards;
+
+  // 初期化：CSVを読み込んでカード描画、データを保持
+  document.addEventListener("DOMContentLoaded", async () => {
+    const data = await loadCircles();
+    window.circleData = Array.isArray(data) ? data : [];
+    renderCards(window.circleData);
+  });
 })();
