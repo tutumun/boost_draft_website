@@ -1,5 +1,5 @@
 /* =========================================
-   ブースト！公式サイト 共通スタイル
+   ブースト！公式サイト 共通スタイル（完全版）
    ※ デザイン・内容は HTML に準拠。HTMLは変更せず、
      現行のマークアップ（クラス名/ID）に合わせて見た目のみ定義。
    ========================================= */
@@ -15,8 +15,8 @@
   --card: #ffffff;               /* カード背景 */
   --shadow: 0 2px 10px rgba(0,0,0,.06); /* カード影 */
   --radius: 10px;                /* 角丸 */
-  --maxw: 960px;                 /* 本文の最大幅 */
-  --space-1: .25rem;
+  --maxw: 960px;                 /* 本文の最大幅（必要に応じて調整可） */
+  --space-1: .25rem;             /* 余白スケール */
   --space-2: .5rem;
   --space-3: .75rem;
   --space-4: 1rem;
@@ -103,7 +103,7 @@ section table tr:last-child th, section table tr:last-child td { border-bottom: 
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   display: grid;
-  grid-template-columns: 120px 1fr;
+  grid-template-columns: 120px 1fr; /* 左：画像固定幅／右：可変 */
   gap: var(--space-3);
   padding: var(--space-3);
   align-items: start;
@@ -153,7 +153,7 @@ section { margin-bottom: var(--space-6); }
 }
 
 /* ================================
-   サークルカードのスタイル
+   サークルカードのスタイル（旧カード互換）
    ================================ */
 .circle-card {
   display: flex;
@@ -211,7 +211,9 @@ section { margin-bottom: var(--space-6); }
   display: block;
 }
 
-/* style.css に追記：ナビゲーションバーを上部に固定（スクロールで消えないようにする） */
+/* ================================
+   ナビゲーション固定（テーマ差異吸収用）
+   ================================ */
 /* ▼あなたのナビ要素のセレクタに合わせて、必要な方だけ残してください */
 header.global-nav,
 nav.global-nav,
@@ -223,7 +225,7 @@ nav.site-nav,
   background: #fff;      /* 背景を白で塗って下のコンテンツが透けないようにする */
 }
 
-/* 影や境界線が必要なら任意で */
+/* 影や境界線（任意） */
 header.global-nav,
 nav.global-nav,
 nav.site-nav,
@@ -232,50 +234,43 @@ nav.site-nav,
   border-bottom: 1px solid #eee;
 }
 
-#circleList table {
-  width: 100%;           /* 表をコンテナ幅いっぱいに広げる */
-  table-layout: fixed;   /* 各列の幅を均等に分配 */
-}
-
-#circleList th,
-#circleList td {
-  padding: 6px 10px;     /* セルの内側に余白を増やす（見やすさ用） */
-  word-wrap: break-word; /* 内容が長い場合は折り返す */
-}
-
-/* サークル一覧 表表示 用のスタイル */
-#circleList table {
-  border-collapse: collapse; /* 枠線を重ねて一本化 */
-  width: 100%;               /* コンテナ幅いっぱいに広げる */
-  table-layout: fixed;        /* 固定レイアウトで列幅を割合指定 */
-}
-
-#circleList th,
-#circleList td {
-  border: 1px solid #ccc;     /* 罫線を追加 */
-  padding: 6px 10px;          /* セル内余白 */
-  text-align: left;           /* 左寄せ */
-  word-wrap: break-word;      /* 内容が長い場合は折り返す */
-}
-
-
-/* 表リストの外側ブロックを広げる */
+/* ================================
+   サークル一覧 表表示 用のスタイル（サイズ調整しやすい分割）
+   ================================ */
+/* テーブル外側ブロック：全体幅の上限を制御 */
 #circleList {
-  max-width: 1360px;   /* ← 広げたい最終幅（例：1360px） */
+  max-width: 1360px;   /* ← 表全体の最大幅。100% にするとページいっぱい */
   margin-left: auto;   /* センター揃え */
   margin-right: auto;  /* センター揃え */
-  padding-left: 12px;  /* 端がくっつかない程度の余白 */
-  padding-right: 12px; /* 端がくっつかない程度の余白 */
+  padding-left: 12px;  /* 端の余白 */
+  padding-right: 12px; /* 端の余白 */
 }
 
-/* テーブル自体はコンテナいっぱいに広げる（既に指定済みなら不要） */
+/* テーブル本体：コンテナいっぱいに広げる */
 #circleList table {
-  width: 100%;
-  table-layout: fixed; /* 列幅%指定を尊重しつつ安定配置 */
+  width: 100%;               /* コンテナ幅いっぱい */
+  table-layout: fixed;       /* 固定レイアウトで列幅%指定を尊重し安定配置 */
+  border-collapse: collapse; /* 枠線を重ねて一本化 */
 }
 
-/* 列幅（ご指定の比率） */
+/* セル基本：罫線・余白・折返し */
+#circleList th,
+#circleList td {
+  border: 1px solid #ccc;     /* 罫線 */
+  padding: 6px 10px;          /* セル内余白 */
+  text-align: left;           /* 左寄せ */
+  word-wrap: break-word;      /* 長文を折り返す */
+}
+
+/* 列幅（比率）：必要に応じて%を調整してください */
 #circleList th:nth-child(1), #circleList td:nth-child(1) { width: 20%; } /* スペース */
 #circleList th:nth-child(2), #circleList td:nth-child(2) { width: 30%; } /* サークル名 */
 #circleList th:nth-child(3), #circleList td:nth-child(3) { width: 25%; } /* PN */
 #circleList th:nth-child(4), #circleList td:nth-child(4) { width: 15%; } /* 区分 */
+
+/* 表ヘッダの視認性向上 */
+#circleList thead th { background: #f8fafc; font-weight: 600; }
+
+/* 最終行の下罫線を消す（任意） */
+#circleList tr:last-child th,
+#circleList tr:last-child td { border-bottom: none; }
