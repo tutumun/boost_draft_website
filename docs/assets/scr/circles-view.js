@@ -62,20 +62,7 @@
   /** データ取得（未ロード時は空配列） */
   const getData = () => Array.isArray(window.circleData) ? window.circleData : [];
 
-  function initView() {
-    const data = getData();
-    // space列が1つでも埋まっていればサークル順デフォルト
-    const hasSpace = data.some(d => (d.space || "").trim() !== "");
-
-    if (hasSpace) {
-      // サークル順デフォルト → A列から表示
-      renderSpaceView("A");
-    } else {
-      // spaceがすべて空欄なら五十音順デフォルト → あ行から表示
-      renderKanaView("あ");
-    }
-  }
-
+  
   /** circleData の到着を待つ（最大 5 秒） */
   function waitForData(timeoutMs = 5000) {
     if (getData().length > 0) return Promise.resolve(getData());
@@ -446,5 +433,60 @@ function renderKanaView(initialKey = "あ") {
     if (btnSpace) btnSpace.addEventListener("click", () => renderSpaceView("A"));
     if (btnTable) btnTable.addEventListener("click", () => renderPlainTable("all"));
   });
+  /**
+   * 初期表示の選択：
+   * - CSV に space が 1 件でも入っていれば「サークル順(A)」
+   * - 全件空欄（または列なし）の場合は「五十音(あ)」
+   */
+  function initView() {
+    try {
+      const data = getData(); // 既存ヘルパ（存在しない場合は Array を返す実装にしてください）
+      const hasSpace = Array.isArray(data) && data.some(d => (d?.space ?? "").toString().trim() !== "");
+
+      if (hasSpace) {
+        // ★ 要望どおりデフォルトはサークル順（A）に変更
+        renderSpaceView("A");
+      } else {
+        // ★ space が全て空欄なら五十音（あ）
+        renderKanaView("あ");
+      }
+    } catch (e) {
+      console.error("[initView] error:", e);
+      // フォールバック（何かあっても五十音で出す）
+      renderKanaView("あ");
+    }
+  }
+
+  // DOM 準備完了後にデータ待ち → 初期描画 → トップの切替ボタンにイベントを付与
+  document.addEventListener("DOMContentLoaded", async () => {
+    try {
+      // circleData の到着を待機（既存の waitForData を利用）
+      if (typeof waitForData === "function") {
+        await waitForData();
+      }
+
+      // 初期描画（space 有無で切替）
+      initView();
+
+      // ▼ 上部タブ（想定ID）
+      const btnKana  = document.getElementById("sortKana");
+      const btnSpace = document.getElementById("sortSpace");
+      const btnTable = document.getElementById("viewTable");
+
+      // クリックで各ビューへ（初期キーは要望どおり）
+      if (btnKana)  btnKana.addEventListener("click", () => renderKanaView("あ"));
+      if (btnSpace) btnSpace.addEventListener("click", () => renderSpaceView("A"));
+      if (btnTable) btnTable.addEventListener("click", () => renderPlainTable("all"));
+    } catch (e) {
+      console.error("[DOMContentLoaded] init failed:", e);
+    }
+  });
+
+  
+  // ▼ グローバル公開（HTML 側が inline onclick を使っていても動作するように）
+  window.renderKanaView   = window.renderKanaView   || renderKanaView;
+  window.renderSpaceView  = window.renderSpaceView  || renderSpaceView;
+  window.renderPlainTable = window.renderPlainTable || renderPlainTable;
+  window.initView         = window.initView         || initView;
 
 })();
