@@ -1,18 +1,56 @@
-// circles-view.js
-// 50音表示／スペース順表示／表表示 の切替とサブボタン制御
-// 仕様概要：
-//  - デフォルト表示は「50音表示（kana順）」でカード描画を使用（renderCards）
-//  - スペース順表示もカード描画を使用（renderCards）
-//  - 表表示は Excel 等にコピペしても崩れない“純テキストのテーブル”を出力（renderTable）
-//  - サブボタン：
-//      * 50音表示 … 「あ/か/さ/た/な/は/ま/や/ら/わ」「企業」
-//      * スペース順表示 … 「A/B/C/D/E」「企業」「委託」
-//      * 表表示 … 「A/B/C/D/E」「企業」「すべて」※データは全件のまま（非フィルタ）
+// circles-view.js（全面改定版）
+// 目的：
+//  - 50音表示／スペース順表示／表表示 の3モードを提供
+//  - 表表示（プレーンテーブル）の列幅を JS 側で「確実に」制御（<colgroup>＋style直指定）
+//  - 列幅や合計幅をグローバル設定から「微調整」できるAPIを提供
+//  - ボタン要件：
+//      * 50音表示 … 「あ/か/さ/た/な/は/ま/や/ら/わ」「企業」「すべて」 ←（★追加）
+//      * スペース順表示 … 「A/B/C/D/E」「企業」「委託」「すべて」 ←（★追加）
+//      * 表表示 … 「A/B/C/D/E」「企業」「すべて」（ナビ兼フィルタに変更） ←（★仕様変更）
 //  - 「さらに読み込む」(#loadMoreCircles) はカード表示のみ。フィルタ後の件数が20件以下なら非表示。
 //  - 比較関数 compareKana / compareSpaceStr は window に公開（他JSでも利用可）
 
 (() => {
   "use strict";
+
+  /* =========================
+   * グローバル設定（微調整用）
+   * ========================= */
+  // 表（プレーンテーブル）の列幅（px）とテーブル幅の制御を一元管理
+  const defaultTableConfig = {
+    // 列幅： [スペース, サークル名, PN, 区分]（px）
+    widths: [160, 200, 200, 150],
+    // 合計幅を「widthsの合計」に固定するか（true 推奨）
+    forceTotalWidthBySum: true,
+    // 明示的にテーブル総幅を固定したい場合は数値を指定（px）。nullなら widths 合計を利用
+    explicitTotalWidth: null,
+    // コンテナ側（#circleList）の最大幅（px）。null ならCSS任せ
+    containerMaxWidth: 1360
+  };
+
+  // window からも触れるように公開（微調整しやすい）
+  window.circleTableConfig = window.circleTableConfig || { ...defaultTableConfig };
+
+  // 簡易API：開発コンソールから即時反映できるよう公開
+  window.setTableWidths = (arr) => {
+    if (Array.isArray(arr) && arr.length === 4 && arr.every(n => Number.isFinite(n))) {
+      window.circleTableConfig.widths = arr.map(n => Math.max(40, Math.floor(n))); // 最小40px保護
+      // 再描画（現在が表表示なら即時反映）
+      if (window.__currentView === "table") renderPlainTable(window.__currentFilterKey || "all");
+    }
+  };
+  window.setTableTotalWidth = (pxOrNull) => {
+    if (pxOrNull == null) {
+      window.circleTableConfig.explicitTotalWidth = null;
+    } else if (Number.isFinite(pxOrNull)) {
+      window.circleTableConfig.explicitTotalWidth = Math.max(160, Math.floor(pxOrNull)); // 最小160px保護
+    }
+    if (window.__currentView === "table") renderPlainTable(window.__currentFilterKey || "all");
+  };
+  window.resetTableConfig = () => {
+    window.circleTableConfig = { ...defaultTableConfig };
+    if (window.__currentView === "table") renderPlainTable(window.__currentFilterKey || "all");
+  };
 
   /* =========================
    * ユーティリティ
@@ -146,7 +184,7 @@
   }
 
   /* =========================
-   * サブボタン生成
+   * サブボタン生成（共通ヘルパ）
    * ========================= */
 
   function setSubControls(html, onClick, datasetKey = "data-filter") {
@@ -169,6 +207,9 @@
 
   // 50音表示（カード）
   function renderKanaView(initialKey = "あ") {
+    window.__currentView = "kana";
+    window.__currentFilterKey = initialKey;
+
     const base = [...getData()].sort(compareKana);
     const rows = ["あ","か","さ","た","な","は","ま","や","ら","わ"];
 
@@ -176,26 +217,34 @@
       `<div class="row-buttons" role="group" aria-label="50音行フィルタ">
         ${rows.map(r => `<button type="button" data-filter="${r}">${r}</button>`).join("")}
         <button type="button" data-filter="corp">企業</button>
+        <button type="button" data-filter="all">すべて</button> <!-- ★追加 -->
       </div>`,
       (key) => {
+        window.__currentFilterKey = key;
         let data = base;
         if (key === "corp") {
-          // 企業は CAT を優先（CAT が無いデータは含めない）
           const hasCat = data.some(d => (d.cat ?? d.type ?? "").trim() !== "");
           data = hasCat ? data.filter(d => getCatLower(d) === "企業") : [];
+        } else if (key === "all") {
+          // 全件
         } else {
           data = data.filter(d => rowKeyForRecord(d) === key);
         }
         if (typeof window.renderCards === "function") {
           window.renderCards(data);
-          // フィルタ件数が 20 以下なら「さらに読み込む」を非表示
           toggleLoadMore(data.length > 20);
         }
       }
     );
 
     // 初回描画
-    const first = base.filter(d => rowKeyForRecord(d) === initialKey);
+    let first = base;
+    if (initialKey === "corp") {
+      const hasCat = base.some(d => (d.cat ?? d.type ?? "").trim() !== "");
+      first = hasCat ? base.filter(d => getCatLower(d) === "企業") : [];
+    } else if (initialKey !== "all") {
+      first = base.filter(d => rowKeyForRecord(d) === initialKey);
+    }
     if (typeof window.renderCards === "function") {
       window.renderCards(first);
       toggleLoadMore(first.length > 20);
@@ -207,6 +256,9 @@
 
   // スペース順表示（カード）
   function renderSpaceView(initialKey = "A") {
+    window.__currentView = "space";
+    window.__currentFilterKey = initialKey;
+
     const base = [...getData()].sort((a, b) => compareSpaceStr(a.space || "", b.space || ""));
     const letters = ["A","B","C","D","E"];
 
@@ -215,8 +267,10 @@
         ${letters.map(L => `<button type="button" data-filter="${L}">${L}</button>`).join("")}
         <button type="button" data-filter="corp">企業</button>
         <button type="button" data-filter="itaku">委託</button>
+        <button type="button" data-filter="all">すべて</button> <!-- ★追加 -->
       </div>`,
       (key) => {
+        window.__currentFilterKey = key;
         let data = base;
         if (key === "corp") {
           const hasCat = data.some(d => (d.cat ?? d.type ?? "").trim() !== "");
@@ -224,6 +278,8 @@
         } else if (key === "itaku") {
           const hasCat = data.some(d => (d.cat ?? d.type ?? "").trim() !== "");
           data = hasCat ? data.filter(d => getCatLower(d) === "委託") : [];
+        } else if (key === "all") {
+          // 全件
         } else {
           const re = new RegExp(`^${key}`, "i");
           data = data.filter(d => re.test(String(d.space || "")));
@@ -235,8 +291,17 @@
       }
     );
 
-    const reInit = new RegExp(`^${initialKey}`, "i");
-    const first = base.filter(d => reInit.test(String(d.space || "")));
+    let first = base;
+    if (initialKey === "corp") {
+      const hasCat = base.some(d => (d.cat ?? d.type ?? "").trim() !== "");
+      first = hasCat ? base.filter(d => getCatLower(d) === "企業") : [];
+    } else if (initialKey === "itaku") {
+      const hasCat = base.some(d => (d.cat ?? d.type ?? "").trim() !== "");
+      first = hasCat ? base.filter(d => getCatLower(d) === "委託") : [];
+    } else if (initialKey !== "all") {
+      const reInit = new RegExp(`^${initialKey}`, "i");
+      first = base.filter(d => reInit.test(String(d.space || "")));
+    }
     if (typeof window.renderCards === "function") {
       window.renderCards(first);
       toggleLoadMore(first.length > 20);
@@ -246,147 +311,142 @@
     if (initBtn) initBtn.classList.add("active");
   }
 
-  // 表表示（Excel安全：純テキスト表。A/B/C/D/E・企業・すべてボタンは“非フィルタ”のナビ用）
-  // ▼ circles-view.js の renderPlainTable をこの版に差し替えてください
-  //   目的: 表の各列を 200px 固定にし、CSS ではなく JS 側で <colgroup> を用いて強制
-  //   ポイント:
-  //     - table に tableLayout: 'fixed'、width: 'auto' を指定
-  //     - <colgroup><col style="width:200px">×4 を挿入し、ブラウザの自動レイアウトに勝つ
-  //     - 既存の setSubControls / toggleLoadMore / getData / compareSpaceStr は既存の定義を利用
-  //
-  //   ※ circles-view.js 全体を置き換える必要はなく、この関数のみ差し替えればOK
-  //   ※ 将来、% 指定やレスポンシブ化に戻す際は widths 配列を書き換えるだけで対応可
+  // 表表示（Excel安全：純テキスト表。★ナビ兼フィルタに変更）
+  function renderPlainTable(initialKey = "all") {
+    window.__currentView = "table";
+    window.__currentFilterKey = initialKey;
 
-  // circles-view.js
-// 表表示（Excel安全：純テキスト表）を“確実に幅固定＆横スクロール”で描画する差し替え版
-function renderPlainTable() {
-  // ← ここを差し替え（上部の関数シグネチャは既存と同じ）
+    // ▼ サブボタン生成（押すとフィルタして再描画）
+    setSubControls(
+      `<div class="row-buttons" role="group" aria-label="表表示フィルタ">
+        <button type="button" data-filter="A">A</button>
+        <button type="button" data-filter="B">B</button>
+        <button type="button" data-filter="C">C</button>
+        <button type="button" data-filter="D">D</button>
+        <button type="button" data-filter="E">E</button>
+        <button type="button" data-filter="corp">企業</button>
+        <button type="button" data-filter="all" class="active">すべて</button>
+      </div>`,
+      (key) => renderPlainTable(key), // 自身を呼び直して反映
+      "data-filter"
+    );
 
-  // ▼ 強制固定用の列幅（テスト値：200px固定 × 4列）
-  const COL_W = 200;
-  const COLS = [COL_W, COL_W, COL_W, COL_W]; // [スペース, サークル名, PN, 区分]
+    // ▼ データを base に（スペース順で安定ソート）
+    const base = [...getData()].sort((a, b) => compareSpaceStr(a.space || "", b.space || ""));
 
-  // ▼ コンテナ取得（#circleList が無ければ何もしない）
-  const container = document.getElementById("circleList");
-  if (!container) return;
+    // ▼ フィルタ適用
+    let data = base;
+    if (initialKey === "corp") {
+      const hasCat = base.some(d => (d.cat ?? d.type ?? "").trim() !== "");
+      data = hasCat ? base.filter(d => getCatLower(d) === "企業") : [];
+    } else if (["A","B","C","D","E"].includes(initialKey)) {
+      const re = new RegExp(`^${initialKey}`, "i");
+      data = base.filter(d => re.test(String(d.space || "")));
+    } // "all" は全件
 
-  // ▼ 表示領域を初期化し、横スクロールを必ず許可
-  container.innerHTML = "";
-  container.style.overflowX = "auto";     // 横スクロールを強制的に出せるように
-  container.style.webkitOverflowScrolling = "touch"; // iOS系の慣性スクロール
+    // ▼ コンテナ
+    const container = $("circleList");
+    if (!container) return;
+    container.innerHTML = "";
 
-  // ▼ データを space 順で安定ソート
-  const sorted = [...(Array.isArray(window.circleData) ? window.circleData : [])]
-    .sort((a, b) => {
-      // compareSpaceStr が存在すれば利用／なければ簡易比較
-      const sa = String(a?.space || "");
-      const sb = String(b?.space || "");
-      if (typeof window.compareSpaceStr === "function") {
-        return window.compareSpaceStr(sa, sb);
-      }
-      return sa.localeCompare(sb, "ja");
+    // 横スクロールの強制（はみ出し時）
+    container.style.overflowX = "auto";
+    container.style.webkitOverflowScrolling = "touch";
+    if (Number.isFinite(window.circleTableConfig.containerMaxWidth)) {
+      container.style.maxWidth = window.circleTableConfig.containerMaxWidth + "px";
+      container.style.marginLeft = "auto";
+      container.style.marginRight = "auto";
+      container.style.paddingLeft = "12px";
+      container.style.paddingRight = "12px";
+    }
+
+    // ▼ 設定読込
+    const cfg = window.circleTableConfig;
+    const COLS = (cfg?.widths && cfg.widths.length === 4) ? cfg.widths : defaultTableConfig.widths;
+    const sum = COLS.reduce((a,b)=>a+b, 0);
+    const totalWidth = (cfg.explicitTotalWidth != null)
+      ? cfg.explicitTotalWidth
+      : (cfg.forceTotalWidthBySum ? sum : sum); // 現状は合計優先
+
+    // ▼ テーブル生成
+    const table = document.createElement("table");
+    table.style.tableLayout = "fixed";
+    table.style.borderCollapse = "collapse";
+
+    // 総幅固定
+    table.style.width = `${totalWidth}px`;
+    table.style.minWidth = `${totalWidth}px`;
+    table.style.maxWidth = `${totalWidth}px`;
+
+    // 列幅を colgroup で宣言（最優先）
+    const colgroup = document.createElement("colgroup");
+    COLS.forEach((w) => {
+      const col = document.createElement("col");
+      col.setAttribute("width", w);
+      col.style.width = `${w}px`;
+      col.style.minWidth = `${w}px`;
+      col.style.maxWidth = `${w}px`;
+      colgroup.appendChild(col);
     });
+    table.appendChild(colgroup);
 
-  // ▼ テーブル生成：幅固定のための“複数レイヤー”指定を行う
-  const table = document.createElement("table");
-
-  // 1) テーブル自体の幅を「合計幅」で固定
-  const totalWidth = COLS.reduce((acc, w) => acc + w, 0);
-  table.style.width = `${totalWidth}px`;   // ← 800px に固定
-  table.style.minWidth = `${totalWidth}px`;
-  table.style.maxWidth = `${totalWidth}px`;
-
-  // 2) 固定レイアウトで列幅を厳守させる
-  table.style.tableLayout = "fixed";
-  table.style.borderCollapse = "collapse";
-
-  // 3) <colgroup> で列幅を宣言（UAに最優先で解釈させる）
-  const colgroup = document.createElement("colgroup");
-  COLS.forEach((w) => {
-    const col = document.createElement("col");
-    // width属性＋styleの二重指定で“効かない”ケースを封じる
-    col.setAttribute("width", w);
-    col.style.width = `${w}px`;
-    col.style.minWidth = `${w}px`;
-    col.style.maxWidth = `${w}px`;
-    colgroup.appendChild(col);
-  });
-  table.appendChild(colgroup);
-
-  // ▼ thead 生成（ヘッダーも幅固定・折返し指定）
-  const thead = document.createElement("thead");
-  const trh = document.createElement("tr");
-  ["スペース", "サークル名", "PN", "区分"].forEach((text, i) => {
-    const th = document.createElement("th");
-    th.textContent = text;
-    // セルにも保険的に幅・折返しを直指定
-    th.style.width = `${COLS[i]}px`;
-    th.style.minWidth = `${COLS[i]}px`;
-    th.style.maxWidth = `${COLS[i]}px`;
-    th.style.whiteSpace = "normal";    // 折返し許可
-    th.style.wordBreak = "break-word"; // 長文強制折返し
-    th.style.border = "1px solid #ccc";
-    th.style.padding = "6px 10px";
-    th.style.background = "#f8fafc";
-    th.style.fontWeight = "600";
-    trh.appendChild(th);
-  });
-  thead.appendChild(trh);
-  table.appendChild(thead);
-
-  // ▼ tbody 生成（各セルにも幅・折返しを直指定）
-  const tbody = document.createElement("tbody");
-  sorted.forEach((d) => {
-    const tr = document.createElement("tr");
-
-    // 各列の値
-    const cells = [
-      String(d?.space || ""),
-      String(d?.name || ""),
-      String(d?.pn || ""),
-      String(d?.cat || d?.type || ""),
-    ];
-
-    cells.forEach((val, i) => {
-      const td = document.createElement("td");
-      td.textContent = val;
-
-      // ――― 強制幅設定（保険：セルにも直書き）
-      td.style.width = `${COLS[i]}px`;
-      td.style.minWidth = `${COLS[i]}px`;
-      td.style.maxWidth = `${COLS[i]}px`;
-
-      // ――― 折返し（長文でもはみ出さないように）
-      td.style.whiteSpace = "normal";
-      td.style.wordBreak = "break-word";
-
-      // ――― 体裁（見やすさ用）
-      td.style.border = "1px solid #ccc";
-      td.style.padding = "6px 10px";
-      td.style.textAlign = "left";
-
-      tr.appendChild(td);
+    // thead
+    const thead = document.createElement("thead");
+    const trh = document.createElement("tr");
+    ["スペース", "サークル名", "PN", "区分"].forEach((txt, i) => {
+      const th = document.createElement("th");
+      th.textContent = txt;
+      th.style.width = `${COLS[i]}px`;
+      th.style.minWidth = `${COLS[i]}px`;
+      th.style.maxWidth = `${COLS[i]}px`;
+      th.style.whiteSpace = "normal";
+      th.style.wordBreak = "break-word";
+      th.style.border = "1px solid #ccc";
+      th.style.padding = "6px 10px";
+      th.style.background = "#f8fafc";
+      th.style.fontWeight = "600";
+      trh.appendChild(th);
     });
+    thead.appendChild(trh);
+    table.appendChild(thead);
 
-    tbody.appendChild(tr);
-  });
-  table.appendChild(tbody);
+    // tbody
+    const tbody = document.createElement("tbody");
+    data.forEach((d) => {
+      const tr = document.createElement("tr");
+      const cells = [
+        String(d?.space || ""),
+        String(d?.name || ""),
+        String(d?.pn || ""),
+        String(d?.cat || d?.type || "")
+      ];
+      cells.forEach((val, i) => {
+        const td = document.createElement("td");
+        td.textContent = val;
+        td.style.width = `${COLS[i]}px`;
+        td.style.minWidth = `${COLS[i]}px`;
+        td.style.maxWidth = `${COLS[i]}px`;
+        td.style.whiteSpace = "normal";
+        td.style.wordBreak = "break-word";
+        td.style.border = "1px solid #ccc";
+        td.style.padding = "6px 10px";
+        td.style.textAlign = "left";
+        tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
 
-  // ▼ コンテナへ追加（横スクロールで 800px の表が見えるはず）
-  container.appendChild(table);
+    // 反映
+    container.appendChild(table);
 
-  // ▼ 表表示では「さらに読み込む」不要
-  if (typeof toggleLoadMore === "function") {
+    // 表表示では「さらに読み込む」は不要
     toggleLoadMore(false);
+
+    // デバッグログ（必要なければ削除OK）
+    console.log(`[renderPlainTable] key=${initialKey}, colWidths=${COLS.join(",")}, total=${totalWidth}px`);
   }
-
-  // ▼ デバッグログ（本当に呼ばれているかの可視化）
-  // 目視確認の助け：必要なければ後で消してください
-  console.log("[renderPlainTable] fixed 200px x 4 columns, total =", totalWidth, "px");
-}
-
-
-  window.renderPlainTable = renderPlainTable; // 必要に応じて他所から呼べるよう公開
+  window.renderPlainTable = renderPlainTable; // 他所からも呼べるよう公開
 
   /* =========================
    * 初期化
@@ -396,13 +456,12 @@ function renderPlainTable() {
     const btnSpace = $("sortSpace");
     const btnTable = $("viewTable");
 
-    // データ到着を待ってから初期表示
     await waitForData();
     renderKanaView("あ"); // デフォルト：50音表示（“あ” 行）
 
     if (btnKana)  btnKana.addEventListener("click", () => renderKanaView("あ"));
     if (btnSpace) btnSpace.addEventListener("click", () => renderSpaceView("A"));
-    if (btnTable) btnTable.addEventListener("click", () => renderPlainTable());
+    if (btnTable) btnTable.addEventListener("click", () => renderPlainTable("all"));
   });
 
 })();
