@@ -6,14 +6,11 @@
 (() => {
   "use strict";
 
-  /**
-   * スペース番号の比較関数（例: "A-01", "A-1", "A-21"）
-   * - 文字列比較ではなく、ブロック文字（A/B/C…）＋数値として比較する
-   * - "A-01" と "A-1" は同値として扱う
-   * - 想定外の文字列は最後に回す（元の文字列で比較）
-   */
-  function compareSpace(a, b) {
-    // 正規表現：ブロック文字(A〜Z) + 数値（最初の数字だけ）
+  // スペース番号比較関数（改定版）
+  // ・ブロック文字（A, B, C …）と数値部分を分けて比較
+  // ・「A-01」と「A-1」は同等とみなす
+  // ・「A-41・42」のように区切られている場合は最初の数値のみを利用
+  function compareSpaceStr(a, b) {
     const regex = /^([A-Z]+)-?(\d+)/i;
   
     const ma = a.match(regex);
@@ -23,20 +20,21 @@
       const blockA = ma[1].toUpperCase();
       const blockB = mb[1].toUpperCase();
     
-      // ブロック(A, B, C …)比較
+      // ブロック文字で比較
       if (blockA !== blockB) {
         return blockA.localeCompare(blockB, 'ja');
       }
     
-      // 最初の数値だけを比較
+      // 数値部分を数値化して比較（最初の数値のみ）
       const numA = parseInt(ma[2], 10);
       const numB = parseInt(mb[2], 10);
       return numA - numB;
     }
   
-    // 想定外は文字列比較
+    // フォーマット外は通常の文字列比較
     return a.localeCompare(b, 'ja');
   }
+
 
   /**
    * スペース番号を { valid, block, num } に分解
