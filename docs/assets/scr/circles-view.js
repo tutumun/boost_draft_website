@@ -1,111 +1,87 @@
 // circles-view.js
-// 表示切替（50音表示／スペース順表示／表表示）とサブフィルタ（行ボタン）を制御
-// 仕様：
-//  - デフォルト表示は「50音表示（kana順）」
-//  - カード表示は廃止し、テーブル表示（renderTable）で描画
-//  - 上段ボタン：#sortKana（50音表示） / #sortSpace（スペース順表示） / #viewTable（表表示）
-//  - 下段ボタンコンテナ：#subControls（無ければ自動生成）
-//  - 50音表示の下段：あ・か・さ・た・な・は・ま・や・ら・わ 各行ボタン + 企業ボタン
-//  - スペース順表示の下段：A・B・C・D・E 各ボタン + 企業・委託ボタン
-//  - フィルタ優先度：CAT列（cat/type）がある場合は「企業／委託」判定に最優先で使用
-//  - データ取得：window.circleData（circles-cards.js 等で CSV ロード済み想定）
-//  - compareKana / compareSpaceStr / renderTable は本ファイルで定義・window公開（他ファイルからも利用可）
+// 50音表示／スペース順表示／表表示の切替とサブボタン制御
+// 修正点：
+//  - サブボタン（あ〜わ / A〜E・企業・委託）を #viewControls 直下に必ず表示
+//  - 50音・スペース順の表示は「カード表示（renderCards）」を使用（表表示は viewTable のときのみ）
+//  - フィルタ時、kana/space から行判定できないデータは “除外せず含める” 振る舞いに変更（表示件数が極端に減る不具合を回避）
+//  - さらに読み込むボタン（#loadMoreCircles）の表示/非表示をモードに応じて制御
 
 (() => {
   "use strict";
 
-  /* =========================
-   * ユーティリティ
-   * ========================= */
-
-  /** id で要素取得 */
+  /* ========== ユーティリティ ========== */
   const $ = (id) => document.getElementById(id);
+  const getData = () => Array.isArray(window.circleData) ? window.circleData : [];
 
-  /** サブコントロールのコンテナを確実に用意（無ければ生成） */
+  // 「さらに読み込む」ボタンの表示切替（cards側で id="loadMoreCircles" を生成している想定）
+  function toggleLoadMore(show) {
+    const btn = document.getElementById("loadMoreCircles");
+    if (btn) btn.style.display = show ? "block" : "none";
+  }
+
+  // サブボタンのコンテナを #viewControls の直下に必ず配置
   function ensureSubControls() {
+    const controls = $("viewControls");
     let sub = $("subControls");
     if (!sub) {
       sub = document.createElement("div");
       sub.id = "subControls";
-      const controls = $("viewControls");
-      if (controls && controls.nextSibling) {
-        controls.parentNode.insertBefore(sub, controls.nextSibling);
-      } else if (controls) {
-        controls.parentNode.appendChild(sub);
+      if (controls && controls.parentNode) {
+        // #viewControls の直後に差し込む
+        if (controls.nextSibling) controls.parentNode.insertBefore(sub, controls.nextSibling);
+        else controls.parentNode.appendChild(sub);
       } else {
+        // 念のためのフォールバック
         const list = $("circleList");
-        if (list && list.parentNode) list.parentNode.insertBefore(sub, list);
-        else document.body.appendChild(sub);
+        (list?.parentNode || document.body).insertBefore(sub, list || null);
       }
+    } else if (controls && sub.previousElementSibling !== controls) {
+      // 既に存在しても #viewControls の直下へ移動
+      controls.parentNode.insertBefore(sub, controls.nextSibling);
     }
     return sub;
   }
 
-  /** データ取得（未ロード時は空配列） */
-  const getData = () => Array.isArray(window.circleData) ? window.circleData : [];
+  /* ========== 比較関数（他JSでも使えるよう公開） ========== */
 
-  /** 非同期に circleData の到着を待つ（最大 5 秒） */
-  function waitForData(timeoutMs = 5000) {
-    if (getData().length > 0) return Promise.resolve(getData());
-    return new Promise((resolve) => {
-      const start = Date.now();
-      const timer = setInterval(() => {
-        if (getData().length > 0 || Date.now() - start > timeoutMs) {
-          clearInterval(timer);
-          resolve(getData());
-        }
-      }, 100);
-    });
-  }
-
-  /* =========================
-   * 比較関数（window へ公開）
-   * ========================= */
-
-  /** kana優先の“かな順”比較（Intl.Collator で日本語ソート） */
+  // かな順（kana優先）。なければ name を使用
   function compareKana(a, b) {
     const collator = new Intl.Collator("ja", { usage: "sort", sensitivity: "base", ignorePunctuation: true });
     const ka = (a?.kana ?? a?.name ?? "").toString();
     const kb = (b?.kana ?? b?.name ?? "").toString();
     return collator.compare(ka, kb);
   }
-  window.compareKana = compareKana; // 他から利用できるよう公開
+  window.compareKana = compareKana;
 
-  /** スペース文字列比較（Aブロック→数値。最初の数値のみ比較） */
+  // スペース比較（Aブロック→数値。最初の数値のみ）
   function compareSpaceStr(a, b) {
     const regex = /^([A-Z]+)-?(\d+)/i;
-    const ma = String(a||"").match(regex);
-    const mb = String(b||"").match(regex);
+    const sa = String(a || ""), sb = String(b || "");
+    const ma = sa.match(regex), mb = sb.match(regex);
     if (ma && mb) {
-      const blockA = ma[1].toUpperCase();
-      const blockB = mb[1].toUpperCase();
-      if (blockA !== blockB) return blockA.localeCompare(blockB, "ja");
+      const ba = ma[1].toUpperCase(), bb = mb[1].toUpperCase();
+      if (ba !== bb) return ba.localeCompare(bb, "ja");
       return parseInt(ma[2], 10) - parseInt(mb[2], 10);
     }
-    return String(a||"").localeCompare(String(b||""), "ja");
+    return sa.localeCompare(sb, "ja");
   }
   window.compareSpaceStr = compareSpaceStr;
 
-  /* =========================
-   * かな行判定ヘルパ（50音行フィルタ用）
-   * ========================= */
+  /* ========== かな行判定ヘルパ ========== */
 
-  /** 先頭1文字の“基底ひらがな”を取り出す（濁点/半濁点/小書き/カタカナを正規化） */
+  // 先頭1文字を “基底ひらがな” に正規化（濁点/半濁点/小書き/カタカナ対応）
   function normalizeKanaHead(s) {
     if (!s) return "";
     const head = String(s).trim().charAt(0) || "";
     if (!head) return "";
-    // NFKD 分解して結合記号を除去
-    let ch = head.normalize("NFKD").replace(/\p{M}+/gu, "");
-    // カタカナ → ひらがな
-    const code = ch.charCodeAt(0);
+    let ch = head.normalize("NFKD").replace(/\p{M}+/gu, ""); // 結合記号削除
+    const code = ch.charCodeAt(0); // カタカナ→ひらがな
     if (code >= 0x30A1 && code <= 0x30F6) ch = String.fromCharCode(code - 0x60);
-    // 小書きの正規化
     const SMALL = {"ぁ":"あ","ぃ":"い","ぅ":"う","ぇ":"え","ぉ":"お","っ":"つ","ゃ":"や","ゅ":"ゆ","ょ":"よ","ゎ":"わ"};
     return SMALL[ch] || ch;
   }
 
-  /** レコード→かな行キー（"あ/か/さ/た/な/は/ま/や/ら/わ"） */
+  // レコード→行キー（"あ/か/さ/た/な/は/ま/や/ら/わ"）
   function rowKeyForRecord(rec) {
     const src = (rec?.kana || rec?.name || "").toString();
     const ch = normalizeKanaHead(src);
@@ -122,45 +98,17 @@
       "わ": ["わ","を","ん"]
     };
     for (const [row, chars] of Object.entries(ROWS)) if (chars.includes(ch)) return row;
-    return "";
+    return ""; // 判定できない
   }
 
-  /** カテゴリ（cat/type）取得（小文字正規化） */
+  // CAT/type（小文字）
   function getCatLower(d) {
     const cat = d?.cat ?? d?.type ?? "";
     return String(cat).trim().toLowerCase();
   }
 
-  /* =========================
-   * 表描画（フォールバック定義）
-   * ========================= */
+  /* ========== 下段ボタン（サブコントロール） ========== */
 
-  if (typeof window.renderTable !== "function") {
-    /** 最小実装の表描画（renderTable が未定義の場合のみ定義） */
-    window.renderTable = function renderTable(data) {
-      const container = $("circleList");
-      if (!container) return;
-      container.innerHTML = "";
-      const table = document.createElement("table");
-      const thead = document.createElement("thead");
-      thead.innerHTML = "<tr><th>スペース</th><th>サークル名</th><th>PN</th><th>区分</th></tr>";
-      table.appendChild(thead);
-      const tbody = document.createElement("tbody");
-      (data||[]).forEach(d => {
-        const tr = document.createElement("tr");
-        tr.innerHTML = `<td>${d.space||""}</td><td>${d.name||""}</td><td>${d.pn||""}</td><td>${d.cat||d.type||""}</td>`;
-        tbody.appendChild(tr);
-      });
-      table.appendChild(tbody);
-      container.appendChild(table);
-    };
-  }
-
-  /* =========================
-   * 下段ボタン生成＆イベント
-   * ========================= */
-
-  /** 下段ボタン（サブコントロール）を設置し、クリック時のハンドラを設定 */
   function setSubControls(html, onClick) {
     const sub = ensureSubControls();
     sub.innerHTML = html;
@@ -169,18 +117,18 @@
       if (!target) return;
       const key = target.getAttribute("data-filter");
       onClick?.(key);
-      // 視覚的にアクティブ表示
+      // 視覚的アクティブ
       [...sub.querySelectorAll("[data-filter]")].forEach(btn => btn.classList.toggle("active", btn === target));
     };
   }
 
-  /* =========================
-   * 各表示モード
-   * ========================= */
+  /* ========== 各表示モード ========== */
 
-  /** 50音表示（あ/か/…/わ + 企業） */
+  // 50音表示（カード描画）
   function renderKanaView(initialKey = "あ") {
     const base = [...getData()].sort(compareKana);
+
+    // 下段ボタン：あ〜わ + 企業
     const rows = ["あ","か","さ","た","な","は","ま","や","ら","わ"];
     setSubControls(
       `<div class="row-buttons" role="group" aria-label="50音行フィルタ">
@@ -193,23 +141,40 @@
           const hasCat = data.some(d => (d.cat ?? d.type ?? "").trim() !== "");
           data = hasCat ? data.filter(d => getCatLower(d) === "企業") : data;
         } else {
-          data = data.filter(d => rowKeyForRecord(d) === key);
+          // 判定できないデータは “除外しない” 方針（表示減少バグ対策）
+          data = data.filter(d => {
+            const row = rowKeyForRecord(d);
+            return (row === key) || (row === "");
+          });
         }
-        window.renderTable(data);
+        if (typeof window.renderCards === "function") {
+          window.renderCards(data);
+          toggleLoadMore(true);
+        }
       }
     );
-    // 初回描画
-    let data = base.filter(d => rowKeyForRecord(d) === initialKey);
-    window.renderTable(data);
-    // 初期選択の視覚化
+
+    // 初回描画（指定行 + 判定不能を含める）
+    let data = base.filter(d => {
+      const row = rowKeyForRecord(d);
+      return (row === initialKey) || (row === "");
+    });
+    if (typeof window.renderCards === "function") {
+      window.renderCards(data);
+      toggleLoadMore(true);
+    }
+
+    // 初期選択のアクティブ表示
     const sub = ensureSubControls();
     const initBtn = sub.querySelector(`[data-filter="${initialKey}"]`);
     if (initBtn) initBtn.classList.add("active");
   }
 
-  /** スペース順表示（A〜E + 企業 + 委託） */
+  // スペース順表示（カード描画）
   function renderSpaceView(initialKey = "A") {
-    const base = [...getData()].sort((a,b) => compareSpaceStr(a.space||"", b.space||""));
+    const base = [...getData()].sort((a, b) => compareSpaceStr(a.space || "", b.space || ""));
+
+    // 下段ボタン：A〜E + 企業 + 委託
     const letters = ["A","B","C","D","E"];
     setSubControls(
       `<div class="row-buttons" role="group" aria-label="スペース行フィルタ">
@@ -227,39 +192,47 @@
           data = hasCat ? data.filter(d => getCatLower(d) === "委託") : data;
         } else {
           const re = new RegExp(`^${key}`, "i");
-          data = data.filter(d => re.test(String(d.space||"")));
+          // space 判定できない（空など）データは “除外しない”
+          data = data.filter(d => re.test(String(d.space || "")) || !String(d.space || "").trim());
         }
-        window.renderTable(data);
+        if (typeof window.renderCards === "function") {
+          window.renderCards(data);
+          toggleLoadMore(true);
+        }
       }
     );
-    // 初回描画
+
+    // 初回描画（該当レター + space未設定も含む）
     const reInit = new RegExp(`^${initialKey}`, "i");
-    let data = base.filter(d => reInit.test(String(d.space||"")));
-    window.renderTable(data);
+    let data = base.filter(d => reInit.test(String(d.space || "")) || !String(d.space || "").trim());
+    if (typeof window.renderCards === "function") {
+      window.renderCards(data);
+      toggleLoadMore(true);
+    }
+
+    // 初期選択のアクティブ表示
     const sub = ensureSubControls();
     const initBtn = sub.querySelector(`[data-filter="${initialKey}"]`);
     if (initBtn) initBtn.classList.add("active");
   }
 
-  /** 表表示（全件・下段ボタン無し） */
+  // 表表示（全件／サブボタン無し）
   function renderPlainTable() {
     const sub = ensureSubControls();
     sub.innerHTML = "";
-    window.renderTable(getData());
+    if (typeof window.renderTable === "function") {
+      window.renderTable(getData());
+      toggleLoadMore(false);
+    }
   }
 
-  /* =========================
-   * 初期化（イベント登録 & デフォルト表示）
-   * ========================= */
-  document.addEventListener("DOMContentLoaded", async () => {
+  /* ========== 初期化（デフォルト 50音 “あ” 行） ========== */
+  document.addEventListener("DOMContentLoaded", () => {
     const btnKana  = $("sortKana");
     const btnSpace = $("sortSpace");
     const btnTable = $("viewTable");
 
-    // データ到着を待ってから初期描画
-    await waitForData();
-
-    // デフォルト：50音表示（“あ” 行）
+    // 最初は 50音表示
     renderKanaView("あ");
 
     if (btnKana)  btnKana.addEventListener("click", () => renderKanaView("あ"));

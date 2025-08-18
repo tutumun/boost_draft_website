@@ -11,7 +11,7 @@
   "use strict";
 
   /** 1ページの表示件数（デフォルト20件） */
-  const PAGE_SIZE = 20;
+  const PAGE_SIZE = 21;
 
   /** 内部状態: 現在の描画位置（何件描いたか） */
   let _renderedCount = 0;
@@ -186,10 +186,10 @@
   function createCard(c) {
     const card = document.createElement("div");
     card.className = "circle-card";  // スタイルはCSSに集約
-  
+
     const thumb = c.thumb || c.cut || "assets/img/noimage.png";
     const snsHtml = buildSnsLinks(c.sns);
-  
+
     card.innerHTML = `
       <div class="thumb">
         <img src="${thumb}" alt="" />
