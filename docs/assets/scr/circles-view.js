@@ -62,6 +62,20 @@
   /** データ取得（未ロード時は空配列） */
   const getData = () => Array.isArray(window.circleData) ? window.circleData : [];
 
+  function initView() {
+    const data = getData();
+    // space列が1つでも埋まっていればサークル順デフォルト
+    const hasSpace = data.some(d => (d.space || "").trim() !== "");
+
+    if (hasSpace) {
+      // サークル順デフォルト → A列から表示
+      renderSpaceView("A");
+    } else {
+      // spaceがすべて空欄なら五十音順デフォルト → あ行から表示
+      renderKanaView("あ");
+    }
+  }
+
   /** circleData の到着を待つ（最大 5 秒） */
   function waitForData(timeoutMs = 5000) {
     if (getData().length > 0) return Promise.resolve(getData());
