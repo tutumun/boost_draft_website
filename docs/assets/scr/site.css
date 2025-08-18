@@ -242,3 +242,39 @@ nav.site-nav,
   padding: 6px 10px;     /* セルの内側に余白を増やす（見やすさ用） */
   word-wrap: break-word; /* 内容が長い場合は折り返す */
 }
+
+/* サークル一覧 表表示 用のスタイル */
+#circleList table {
+  border-collapse: collapse; /* 枠線を重ねて一本化 */
+  width: 100%;               /* コンテナ幅いっぱいに広げる */
+  table-layout: fixed;        /* 固定レイアウトで列幅を割合指定 */
+}
+
+#circleList th,
+#circleList td {
+  border: 1px solid #ccc;     /* 罫線を追加 */
+  padding: 6px 10px;          /* セル内余白 */
+  text-align: left;           /* 左寄せ */
+  word-wrap: break-word;      /* 内容が長い場合は折り返す */
+}
+
+/* 列ごとの幅を調整 */
+#circleList th:nth-child(1),
+#circleList td:nth-child(1) {
+  width: 20%; /* スペース */
+}
+
+#circleList th:nth-child(2),
+#circleList td:nth-child(2) {
+  width: 30%; /* サークル名 */
+}
+
+#circleList th:nth-child(3),
+#circleList td:nth-child(3) {
+  width: 25%; /* PN */
+}
+
+#circleList th:nth-child(4),
+#circleList td:nth-child(4) {
+  width: 15%; /* 区分 */
+}
