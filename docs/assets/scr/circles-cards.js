@@ -143,58 +143,106 @@
    * - 入力: 文字列（空白/|/, 区切り） or { key: url } オブジェクト
    * - 空欄は除外、複数は " | " で結合、favicon 付与
    */
+  // 修正1: SNSパースの厳格化（" | " 区切りのみ）+ オブジェクト両対応
   function buildSnsLinks(sns) {
-    if (sns == null || sns === "") return "";
+   // 空欄は非表示
+   if (sns == null || sns === "") return "";
 
-    let pairs = [];
-    if (typeof sns === "object" && !Array.isArray(sns)) {
-      // { key: url } 形式
-      for (const [k, v] of Object.entries(sns)) {
-        if (typeof v === "string" && v.trim() !== "") {
-          pairs.push([k, v.trim()]);
-        }
-      }
-    } else if (typeof sns === "string") {
-      // "https://... | https://..." 形式（空白/|/, 区切り）
-      const parts = sns.split(/[\\s|,]+/).map(s => s.trim()).filter(Boolean);
-      pairs = parts.map(href => [href, href]);
-    }
+   // ラベル推定（キー名 or URLドメイン）
+   const guessLabel = (hrefOrKey) => {
+     const key = String(hrefOrKey).toLowerCase();
+     if (/(^|\b)(x|twitter)(\b|$)/.test(key)) return "X";
+     if (/instagram|(^|\b)ig(\b|$)/.test(key)) return "Instagram";
+     if (/youtube|(^|\b)yt(\b|$)/.test(key)) return "YouTube";
+     if (/tiktok/.test(key)) return "TikTok";
+     if (/pixiv/.test(key)) return "pixiv";
+     if (/booth/.test(key)) return "BOOTH";
+     if (/bluesky|(^|\b)bsky(\b|$)/.test(key)) return "Bluesky";
+     if (/threads/.test(key)) return "Threads";
+     if (/note/.test(key)) return "note";
+     if (/web|site|homepage|url/.test(key)) return "Web";
+     try {
+       const host = new URL(hrefOrKey).hostname;
+       if (host.includes("x.com") || host.includes("twitter.com")) return "X";
+       if (host.includes("instagram.com")) return "Instagram";
+       if (host.includes("youtube.com") || host.includes("youtu.be")) return "YouTube";
+       if (host.includes("tiktok.com")) return "TikTok";
+       if (host.includes("pixiv.net")) return "pixiv";
+       if (host.includes("booth.pm")) return "BOOTH";
+       if (host.includes("bsky.app")) return "Bluesky";
+       if (host.includes("threads.net")) return "Threads";
+       if (host.includes("note.com")) return "note";
+     } catch {}
+     return "Web";
+   };
 
-    if (pairs.length === 0) return "";
+   // favicon URL（Google S2）
+   const faviconUrl = (href, size = 16) => {
+     try {
+       const u = new URL(href);
+       return `https://www.google.com/s2/favicons?domain=${u.hostname}&sz=${size}`;
+     } catch { return ""; }
+   };
 
-    return pairs.map(([labelOrHref, href]) => {
-      const label = guessLabel(labelOrHref);
-      const ico = faviconUrl(href);
-      const iconImg = ico ? `<img src="${ico}" alt="" width="16" height="16" loading="lazy">` : "";
-      return `<a href="${href}" target="_blank" rel="noopener noreferrer">${iconImg}<span>${label}</span></a>`;
-    }).join(" | ");
+   let pairs = [];
+
+   // 文字列: "url | url | url" のみを区切る（空白単体では区切らない）
+   if (typeof sns === "string") {
+     const parts = sns.split(/\s*\|\s*/).map(s => s.trim()).filter(Boolean);
+     pairs = parts.map(href => [href, href]);
+   }
+   // オブジェクト: { x: "url", pixiv: "url", ... }
+   else if (typeof sns === "object" && !Array.isArray(sns)) {
+     for (const [k, v] of Object.entries(sns)) {
+       if (typeof v === "string" && v.trim() !== "") {
+         pairs.push([k, v.trim()]);
+       }
+     }
+   }
+
+   if (pairs.length === 0) return "";
+
+   const anchors = pairs.map(([labelOrHref, href]) => {
+     const label = guessLabel(labelOrHref);
+     const ico = faviconUrl(href);
+     const iconImg = ico ? `<img src="${ico}" alt="" width="16" height="16" loading="lazy">` : "";
+     return `<a href="${href}" target="_blank" rel="noopener noreferrer">${iconImg}<span>${label}</span></a>`;
+   });
+
+   return anchors.join(" | ");
   }
 
-  /** カード描画（#circleList に出力） */
+  // 修正2: レイアウト（左: 画像 / 右: 情報）を強制（CSSが無くても横並びになるよう最低限のinline-styleを付与）
   function renderCards(data) {
-    const container = document.getElementById("circleList");
-    if (!container) return;
-    container.innerHTML = "";
+   const container = document.getElementById("circleList"); // 既存構造に合わせる
+   if (!container) return;
+   container.innerHTML = "";
 
-    (data || []).forEach((c) => {
-      const card = document.createElement("div");
-      card.className = "circle-card";
+   (data || []).forEach((c) => {
+     const card = document.createElement("div");
+     card.className = "circle-card";
 
-      const thumb = c.thumb || c.cut || "assets/img/noimage.png";
-      const snsHtml = buildSnsLinks(c.sns);
+     // 横並びを確実にする（サイトCSSがある場合は上書きされてもOKなよう最小限）
+     card.style.display = "flex";
+     card.style.gap = "12px";
+     card.style.alignItems = "flex-start";
 
-      card.innerHTML = `
-        <div class="thumb"><img src="${thumb}" alt=""></div>
-        <div class="meta">
-          <div class="name">${c.name || ""}</div>
-          <div class="space">${c.space || ""}</div>
-          <div class="pn">${c.pn || ""}</div>
-          ${snsHtml ? `<div class="sns">${snsHtml}</div>` : ``}
-        </div>
-      `;
-      container.appendChild(card);
-    });
+     const thumb = c.thumb || c.cut || "assets/img/noimage.png";
+     const snsHtml = buildSnsLinks(c.sns);
+
+     card.innerHTML = `
+       <div class="thumb" style="flex:0 0 auto;"><img src="${thumb}" alt="" style="display:block;max-width:160px;height:auto;"></div>
+       <div class="meta" style="flex:1 1 auto;">
+         <div class="name">${c.name || ""}</div>
+         <div class="space">${c.space || ""}</div>
+         <div class="pn">${c.pn || ""}</div>
+         ${snsHtml ? `<div class="sns">${snsHtml}</div>` : ``}
+       </div>
+     `;
+     container.appendChild(card);
+   });
   }
+
 
   /** CSVロード（GitHub基本構成に従い content/circle-list.csv を使用） */
   async function loadCircles() {
