@@ -258,23 +258,24 @@ nav.site-nav,
   word-wrap: break-word;      /* 内容が長い場合は折り返す */
 }
 
-/* 列ごとの幅を調整 */
-#circleList th:nth-child(1),
-#circleList td:nth-child(1) {
-  width: 20%; /* スペース */
+
+/* 表リストの外側ブロックを広げる */
+#circleList {
+  max-width: 1360px;   /* ← 広げたい最終幅（例：1360px） */
+  margin-left: auto;   /* センター揃え */
+  margin-right: auto;  /* センター揃え */
+  padding-left: 12px;  /* 端がくっつかない程度の余白 */
+  padding-right: 12px; /* 端がくっつかない程度の余白 */
 }
 
-#circleList th:nth-child(2),
-#circleList td:nth-child(2) {
-  width: 30%; /* サークル名 */
+/* テーブル自体はコンテナいっぱいに広げる（既に指定済みなら不要） */
+#circleList table {
+  width: 100%;
+  table-layout: fixed; /* 列幅%指定を尊重しつつ安定配置 */
 }
 
-#circleList th:nth-child(3),
-#circleList td:nth-child(3) {
-  width: 25%; /* PN */
-}
-
-#circleList th:nth-child(4),
-#circleList td:nth-child(4) {
-  width: 15%; /* 区分 */
-}
+/* 列幅（ご指定の比率） */
+#circleList th:nth-child(1), #circleList td:nth-child(1) { width: 20%; } /* スペース */
+#circleList th:nth-child(2), #circleList td:nth-child(2) { width: 30%; } /* サークル名 */
+#circleList th:nth-child(3), #circleList td:nth-child(3) { width: 25%; } /* PN */
+#circleList th:nth-child(4), #circleList td:nth-child(4) { width: 15%; } /* 区分 */

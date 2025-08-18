@@ -223,52 +223,90 @@
   }
 
   /** 表表示（Excel安全：純テキスト表。A/B/C/D/E・企業・すべてボタンは“ナビ用”で非フィルタ） */
-  function renderPlainTable() {
-    // サブボタン（非フィルタ・ナビ用）
-    setSubControls(
-      `<div class="row-buttons" role="group" aria-label="表表示ナビ">
-        <button type="button" data-nav="A">A</button>
-        <button type="button" data-nav="B">B</button>
-        <button type="button" data-nav="C">C</button>
-        <button type="button" data-nav="D">D</button>
-        <button type="button" data-nav="E">E</button>
-        <button type="button" data-nav="corp">企業</button>
-        <button type="button" data-nav="all" class="active">すべて</button>
-      </div>`,
-      null,
-      "data-nav"
-    );
+/* =========================
+ * 表表示（Excel安全・純テキスト表）
+ *  - A〜E／企業／すべて の各ボタンで“表データをフィルタ”して再描画
+ *  - 表モード中はカード描画を行わない（state.mode === "table"）
+ * ========================= */
+function renderPlainTable() {
+  state.mode = "table";          // ← 表モードに固定（他からの renderCards 呼出しをブロック）
+  toggleLoadMore(false);         // 表では「さらに読み込む」を隠す
 
-    // データを space 順で安定ソート
-    const sorted = [...getData()].sort((a, b) => compareSpaceStr(a.space || "", b.space || ""));
+  // ▼サブボタン（押すとフィルタして再描画）
+  setSubControls(
+    `<div class="row-buttons" role="group" aria-label="表表示フィルタ">
+      <button type="button" data-nav="all"  class="active">すべて</button>
+      <button type="button" data-nav="A">A</button>
+      <button type="button" data-nav="B">B</button>
+      <button type="button" data-nav="C">C</button>
+      <button type="button" data-nav="D">D</button>
+      <button type="button" data-nav="E">E</button>
+      <button type="button" data-nav="corp">企業</button>
+    </div>`,
+    (key) => {
+      // クリック時：キーに応じて配列を作りなおし、表を再描画
+      const filtered = makeTableDataset(key);
+      renderTablePure(filtered);
+    },
+    "data-nav"
+  );
 
-    // テーブルを出力（カードは使わない）
-    const container = $("circleList");
-    if (!container) return;
-    container.innerHTML = "";
+  // ▼初回描画：全件（space順）
+  const initial = makeTableDataset("all");
+  renderTablePure(initial);
+}
 
-    const table = document.createElement("table");
-    const thead = document.createElement("thead");
-    thead.innerHTML = "<tr><th>スペース</th><th>サークル名</th><th>PN</th><th>区分</th></tr>";
-    table.appendChild(thead);
+/* -------------------------------------------
+ * 表用データ生成：key に応じて配列をフィルタ＆space順でソート
+ * key: "all" | "A"|"B"|"C"|"D"|"E" | "corp"
+ *  - "all" : 全件
+ *  - A〜E   : space 先頭レター一致（例: "A-01" など）
+ *  - "corp" : cat(またはtype) が "企業"
+ * ------------------------------------------- */
+function makeTableDataset(key) {
+  const base = [...getData()].sort((a, b) => compareSpaceStr(a.space || "", b.space || ""));
+  if (key === "all") return base;
 
-    const tbody = document.createElement("tbody");
-    sorted.forEach((d) => {
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td>${d.space || ""}</td>
-        <td>${d.name || ""}</td>
-        <td>${d.pn || ""}</td>
-        <td>${d.cat || d.type || ""}</td>
-      `;
-      tbody.appendChild(tr);
-    });
-    table.appendChild(tbody);
-    container.appendChild(table);
-
-    // 表表示では必ず非表示
-    toggleLoadMore(false);
+  if (key === "corp") {
+    // CAT優先で企業のみ
+    return base.filter(d => (d.cat ?? d.type ?? "").toString().trim().toLowerCase() === "企業");
   }
+
+  // A〜E の先頭一致
+  const re = new RegExp(`^${key}`, "i");
+  return base.filter(d => re.test(String(d.space || "")));
+}
+
+/* -------------------------------------------
+ * 純テキストの表を #circleList に出力
+ * （Excelにコピペして崩れないよう装飾は入れない）
+ * ------------------------------------------- */
+function renderTablePure(rows) {
+  const container = document.getElementById("circleList");
+  if (!container) return;
+  container.innerHTML = "";
+
+  const table = document.createElement("table");
+  const thead = document.createElement("thead");
+  thead.innerHTML = "<tr><th>スペース</th><th>サークル名</th><th>PN</th><th>区分</th></tr>";
+  table.appendChild(thead);
+
+  const tbody = document.createElement("tbody");
+  (rows || []).forEach((d) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${d.space || ""}</td>
+      <td>${d.name || ""}</td>
+      <td>${d.pn || ""}</td>
+      <td>${d.cat || d.type || ""}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+
+  container.appendChild(table);
+}
+
   window.renderPlainTable = renderPlainTable;
 
   /* =========================
