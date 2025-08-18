@@ -211,3 +211,23 @@ section { margin-bottom: var(--space-6); }
   display: block;
 }
 
+/* style.css に追記：ナビゲーションバーを上部に固定（スクロールで消えないようにする） */
+/* ▼あなたのナビ要素のセレクタに合わせて、必要な方だけ残してください */
+header.global-nav,
+nav.global-nav,
+nav.site-nav,
+#siteNav {
+  position: sticky;      /* スクロールに追従して固定 */
+  top: 0;                /* 画面上端に張り付く */
+  z-index: 1000;         /* コンテンツより手前に表示（数値は環境に応じ調整可） */
+  background: #fff;      /* 背景を白で塗って下のコンテンツが透けないようにする */
+}
+
+/* 影や境界線が必要なら任意で */
+header.global-nav,
+nav.global-nav,
+nav.site-nav,
+#siteNav {
+  box-shadow: 0 2px 6px rgba(0,0,0,.06);
+  border-bottom: 1px solid #eee;
+}

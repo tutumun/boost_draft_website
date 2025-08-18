@@ -59,6 +59,29 @@
     if (btn) btn.style.display = show ? "block" : "none";
   }
 
+  /** サブボタン領域を消す（表モード時） */
+  function clearSubControls() {
+    const sub = document.getElementById("subControls");
+    if (sub) sub.innerHTML = "";
+  }
+
+  /** ▼修正版：表表示 */
+  function renderPlainTable() {
+    clearSubControls();            // サブボタンは非表示
+    toggleLoadMore(false);         // さらに読み込むボタンは隠す
+    if (typeof window.renderTable === "function") {
+      window.renderTable(getData()); // 必ずテーブル描画を呼ぶ（カードは呼ばない）
+    }
+  }
+
+  // ▼ボタンのイベント再紐付け（既に登録している場合は上書きされる想定）
+  document.addEventListener("DOMContentLoaded", () => {
+    const btnTable = document.getElementById("viewTable");
+    if (btnTable) {
+      btnTable.addEventListener("click", renderPlainTable);
+    }
+  });
+
   /* =========================
    * 比較関数（window公開）
    * ========================= */
