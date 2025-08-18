@@ -309,27 +309,53 @@ function renderTablePure(rows) {
 
   window.renderPlainTable = renderPlainTable;
 
-  /* =========================
-   * 初期化（イベント委譲で安定化）
-   * ========================= */
-  document.addEventListener("DOMContentLoaded", async () => {
-    await waitForData();
-
-    // デフォルト：50音表示（“あ” 行）
-    renderKanaView("あ");
-
-    // 切替は #viewControls のイベント委譲で一元化
+/** コントロール結線（イベント委譲） */
+  function wireControls() {
     const controls = $("viewControls");
-    if (controls) {
-      controls.addEventListener("click", (ev) => {
-        const btn = ev.target.closest("button");
-        if (!btn) return;
+    if (!controls) return;
 
-        if (btn.id === "sortKana")       renderKanaView("あ");
-        else if (btn.id === "sortSpace") renderSpaceView("A");
-        else if (btn.id === "viewTable") renderPlainTable();
-      });
+    // 同じハンドラを重複登録しない
+    if (controls.__wired) return;
+    controls.__wired = true;
+
+    controls.addEventListener("click", (ev) => {
+      const btn = ev.target.closest("button");
+      if (!btn) return;
+
+      // 3つの切替ボタンは id で判定（id 名は仕様どおり：sortKana / sortSpace / viewTable）
+      switch (btn.id) {
+        case "sortKana":
+          if (typeof window.renderKanaView === "function") window.renderKanaView("あ");
+          break;
+        case "sortSpace":
+          if (typeof window.renderSpaceView === "function") window.renderSpaceView("A");
+          break;
+        case "viewTable":
+          if (typeof window.renderPlainTable === "function") window.renderPlainTable();
+          break;
+        default:
+          // サブボタン（data-filter / data-nav）は各 renderXXX 内の setSubControls 側で処理
+          break;
+      }
+    }, false);
+  }
+
+  // 初回結線
+  document.addEventListener("DOMContentLoaded", () => {
+    wireControls();
+
+    // 既存コードの初期描画が別にある場合はそれを優先。
+    // なければデフォルトで 50音表示を出しておく。
+    if (typeof window.renderKanaView === "function") {
+      window.renderKanaView("あ");
     }
+  });
+
+  // 監視：#viewControls が動的に差し替えられても再結線する
+  const mo = new MutationObserver(() => wireControls());
+  document.addEventListener("DOMContentLoaded", () => {
+    const root = document.body;
+    if (root) mo.observe(root, { childList: true, subtree: true });
   });
 
 })();
