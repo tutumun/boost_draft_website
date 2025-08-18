@@ -235,42 +235,36 @@ nav.site-nav,
 }
 
 /* ================================
-   サークル一覧 表表示 用のスタイル（サイズ調整しやすい分割）
+   サークル一覧 表表示 用のスタイル（テスト用に固定幅指定）
    ================================ */
-/* テーブル外側ブロック：全体幅の上限を制御 */
 #circleList {
-  max-width: 1360px;   /* ← 表全体の最大幅。100% にするとページいっぱい */
-  margin-left: auto;   /* センター揃え */
-  margin-right: auto;  /* センター揃え */
-  padding-left: 12px;  /* 端の余白 */
-  padding-right: 12px; /* 端の余白 */
+  max-width: 1360px;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 12px;
+  padding-right: 12px;
 }
 
-/* テーブル本体：コンテナいっぱいに広げる */
 #circleList table {
-  width: 100%;               /* コンテナ幅いっぱい */
-  table-layout: fixed;       /* 固定レイアウトで列幅%指定を尊重し安定配置 */
-  border-collapse: collapse; /* 枠線を重ねて一本化 */
+  width: auto;               /* 固定幅にするため auto */
+  table-layout: fixed;       /* 固定レイアウト */
+  border-collapse: collapse;
 }
 
-/* セル基本：罫線・余白・折返し */
 #circleList th,
 #circleList td {
-  border: 1px solid #ccc;     /* 罫線 */
-  padding: 6px 10px;          /* セル内余白 */
-  text-align: left;           /* 左寄せ */
-  word-wrap: break-word;      /* 長文を折り返す */
+  border: 1px solid #ccc;
+  padding: 6px 10px;
+  text-align: left;
+  word-wrap: break-word;
 }
 
-/* 列幅（比率）：必要に応じて%を調整してください */
-#circleList th:nth-child(1), #circleList td:nth-child(1) { width: 20%; } /* スペース */
-#circleList th:nth-child(2), #circleList td:nth-child(2) { width: 30%; } /* サークル名 */
-#circleList th:nth-child(3), #circleList td:nth-child(3) { width: 25%; } /* PN */
-#circleList th:nth-child(4), #circleList td:nth-child(4) { width: 15%; } /* 区分 */
+/* ★ テスト用: 各列をすべて200pxに固定 */
+#circleList th:nth-child(1), #circleList td:nth-child(1) { width: 200px; }
+#circleList th:nth-child(2), #circleList td:nth-child(2) { width: 200px; }
+#circleList th:nth-child(3), #circleList td:nth-child(3) { width: 200px; }
+#circleList th:nth-child(4), #circleList td:nth-child(4) { width: 200px; }
 
-/* 表ヘッダの視認性向上 */
 #circleList thead th { background: #f8fafc; font-weight: 600; }
-
-/* 最終行の下罫線を消す（任意） */
 #circleList tr:last-child th,
 #circleList tr:last-child td { border-bottom: none; }
