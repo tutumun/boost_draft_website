@@ -256,102 +256,135 @@
   //
   //   ※ circles-view.js 全体を置き換える必要はなく、この関数のみ差し替えればOK
   //   ※ 将来、% 指定やレスポンシブ化に戻す際は widths 配列を書き換えるだけで対応可
-  
-  function renderPlainTable() {
-    // --- サブボタン（ナビのみ。データはフィルタしない現状仕様のまま） ---
-    if (typeof setSubControls === 'function') {
-      setSubControls(
-        `<div class="row-buttons" role="group" aria-label="表表示ナビ">
-          <button type="button" data-nav="A">A</button>
-          <button type="button" data-nav="B">B</button>
-          <button type="button" data-nav="C">C</button>
-          <button type="button" data-nav="D">D</button>
-          <button type="button" data-nav="E">E</button>
-          <button type="button" data-nav="corp">企業</button>
-          <button type="button" data-nav="all" class="active">すべて</button>
-        </div>`,
-        null,
-        'data-nav'
-      );
-    }
-  
-    // --- データをスペース順で安定ソート（既存の compareSpaceStr を利用） ---
-    const data = Array.isArray(window.circleData) ? window.circleData : [];
-    const sorted = [...data].sort((a, b) => (window.compareSpaceStr || ((x,y)=>String(x).localeCompare(String(y)) ))(a.space || '', b.space || ''));
-  
-    // --- DOM 取得 & クリア ---
-    const container = document.getElementById('circleList');
-    if (!container) return;
-    container.innerHTML = '';
-  
-    // --- テーブル生成 ---
-    const table = document.createElement('table');
-    table.style.tableLayout = 'fixed'; // 固定レイアウト: 列幅指定を優先
-    table.style.width = 'auto';        // 固定幅にしたいので auto（100%だと%優先されがち）
-    table.style.borderCollapse = 'collapse';
-  
-    // ★ ここが肝: <colgroup> で列幅を 200px 固定にする
-    const widths = ['200px', '200px', '200px', '200px'];
-    const colgroup = document.createElement('colgroup');
-    widths.forEach(w => {
-      const col = document.createElement('col');
-      col.style.width = w; // ブラウザ実装依存の差を超えて強制しやすい
-      colgroup.appendChild(col);
+
+  // circles-view.js
+// 表表示（Excel安全：純テキスト表）を“確実に幅固定＆横スクロール”で描画する差し替え版
+function renderPlainTable() {
+  // ← ここを差し替え（上部の関数シグネチャは既存と同じ）
+
+  // ▼ 強制固定用の列幅（テスト値：200px固定 × 4列）
+  const COL_W = 200;
+  const COLS = [COL_W, COL_W, COL_W, COL_W]; // [スペース, サークル名, PN, 区分]
+
+  // ▼ コンテナ取得（#circleList が無ければ何もしない）
+  const container = document.getElementById("circleList");
+  if (!container) return;
+
+  // ▼ 表示領域を初期化し、横スクロールを必ず許可
+  container.innerHTML = "";
+  container.style.overflowX = "auto";     // 横スクロールを強制的に出せるように
+  container.style.webkitOverflowScrolling = "touch"; // iOS系の慣性スクロール
+
+  // ▼ データを space 順で安定ソート
+  const sorted = [...(Array.isArray(window.circleData) ? window.circleData : [])]
+    .sort((a, b) => {
+      // compareSpaceStr が存在すれば利用／なければ簡易比較
+      const sa = String(a?.space || "");
+      const sb = String(b?.space || "");
+      if (typeof window.compareSpaceStr === "function") {
+        return window.compareSpaceStr(sa, sb);
+      }
+      return sa.localeCompare(sb, "ja");
     });
-    table.appendChild(colgroup);
-  
-    // --- thead ---
-    const thead = document.createElement('thead');
-    const trh = document.createElement('tr');
-    ['スペース', 'サークル名', 'PN', '区分'].forEach((txt, i) => {
-      const th = document.createElement('th');
-      th.textContent = txt;
-      // 念のためヘッダ側にも幅を指定（colgroupが効かない環境の保険）
-      th.style.width = widths[i];
-      trh.appendChild(th);
+
+  // ▼ テーブル生成：幅固定のための“複数レイヤー”指定を行う
+  const table = document.createElement("table");
+
+  // 1) テーブル自体の幅を「合計幅」で固定
+  const totalWidth = COLS.reduce((acc, w) => acc + w, 0);
+  table.style.width = `${totalWidth}px`;   // ← 800px に固定
+  table.style.minWidth = `${totalWidth}px`;
+  table.style.maxWidth = `${totalWidth}px`;
+
+  // 2) 固定レイアウトで列幅を厳守させる
+  table.style.tableLayout = "fixed";
+  table.style.borderCollapse = "collapse";
+
+  // 3) <colgroup> で列幅を宣言（UAに最優先で解釈させる）
+  const colgroup = document.createElement("colgroup");
+  COLS.forEach((w) => {
+    const col = document.createElement("col");
+    // width属性＋styleの二重指定で“効かない”ケースを封じる
+    col.setAttribute("width", w);
+    col.style.width = `${w}px`;
+    col.style.minWidth = `${w}px`;
+    col.style.maxWidth = `${w}px`;
+    colgroup.appendChild(col);
+  });
+  table.appendChild(colgroup);
+
+  // ▼ thead 生成（ヘッダーも幅固定・折返し指定）
+  const thead = document.createElement("thead");
+  const trh = document.createElement("tr");
+  ["スペース", "サークル名", "PN", "区分"].forEach((text, i) => {
+    const th = document.createElement("th");
+    th.textContent = text;
+    // セルにも保険的に幅・折返しを直指定
+    th.style.width = `${COLS[i]}px`;
+    th.style.minWidth = `${COLS[i]}px`;
+    th.style.maxWidth = `${COLS[i]}px`;
+    th.style.whiteSpace = "normal";    // 折返し許可
+    th.style.wordBreak = "break-word"; // 長文強制折返し
+    th.style.border = "1px solid #ccc";
+    th.style.padding = "6px 10px";
+    th.style.background = "#f8fafc";
+    th.style.fontWeight = "600";
+    trh.appendChild(th);
+  });
+  thead.appendChild(trh);
+  table.appendChild(thead);
+
+  // ▼ tbody 生成（各セルにも幅・折返しを直指定）
+  const tbody = document.createElement("tbody");
+  sorted.forEach((d) => {
+    const tr = document.createElement("tr");
+
+    // 各列の値
+    const cells = [
+      String(d?.space || ""),
+      String(d?.name || ""),
+      String(d?.pn || ""),
+      String(d?.cat || d?.type || ""),
+    ];
+
+    cells.forEach((val, i) => {
+      const td = document.createElement("td");
+      td.textContent = val;
+
+      // ――― 強制幅設定（保険：セルにも直書き）
+      td.style.width = `${COLS[i]}px`;
+      td.style.minWidth = `${COLS[i]}px`;
+      td.style.maxWidth = `${COLS[i]}px`;
+
+      // ――― 折返し（長文でもはみ出さないように）
+      td.style.whiteSpace = "normal";
+      td.style.wordBreak = "break-word";
+
+      // ――― 体裁（見やすさ用）
+      td.style.border = "1px solid #ccc";
+      td.style.padding = "6px 10px";
+      td.style.textAlign = "left";
+
+      tr.appendChild(td);
     });
-    thead.appendChild(trh);
-    table.appendChild(thead);
-  
-    // --- tbody ---
-    const tbody = document.createElement('tbody');
-    sorted.forEach(d => {
-      const tr = document.createElement('tr');
-    
-      // 1列目: スペース
-      const td1 = document.createElement('td');
-      td1.textContent = d.space || '';
-      td1.style.width = widths[0];
-      tr.appendChild(td1);
-    
-      // 2列目: サークル名
-      const td2 = document.createElement('td');
-      td2.textContent = d.name || '';
-      td2.style.width = widths[1];
-      tr.appendChild(td2);
-    
-      // 3列目: PN
-      const td3 = document.createElement('td');
-      td3.textContent = d.pn || '';
-      td3.style.width = widths[2];
-      tr.appendChild(td3);
-    
-      // 4列目: 区分（cat/type）
-      const td4 = document.createElement('td');
-      td4.textContent = d.cat || d.type || '';
-      td4.style.width = widths[3];
-      tr.appendChild(td4);
-    
-      tbody.appendChild(tr);
-    });
-    table.appendChild(tbody);
-  
-    // --- 反映 ---
-    container.appendChild(table);
-  
-    // 表表示では「さらに読み込む」は不要
-    if (typeof toggleLoadMore === 'function') toggleLoadMore(false);
+
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+
+  // ▼ コンテナへ追加（横スクロールで 800px の表が見えるはず）
+  container.appendChild(table);
+
+  // ▼ 表表示では「さらに読み込む」不要
+  if (typeof toggleLoadMore === "function") {
+    toggleLoadMore(false);
   }
+
+  // ▼ デバッグログ（本当に呼ばれているかの可視化）
+  // 目視確認の助け：必要なければ後で消してください
+  console.log("[renderPlainTable] fixed 200px x 4 columns, total =", totalWidth, "px");
+}
+
 
   window.renderPlainTable = renderPlainTable; // 必要に応じて他所から呼べるよう公開
 
