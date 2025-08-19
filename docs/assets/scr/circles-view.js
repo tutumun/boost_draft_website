@@ -483,6 +483,9 @@ function setSubControls(html, onClick, datasetKey = "data-scope", mode = window.
       console.error("[initView] error:", e);
       renderKanaView("あ"); // フォールバック
     }
+    document.getElementById("viewControls")?.classList.remove("is-hidden");
+    document.getElementById("subControls")?.classList.remove("is-hidden");
+
   }
 
   // DOMContentLoadedハンドラは一つに集約（※重複定義による競合を避ける）
