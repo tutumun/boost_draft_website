@@ -378,15 +378,17 @@ function setSubControls(html, onClick, datasetKey = "data-scope", mode = window.
     if (initialKey === "corp") {
       const hasCat = base.some(d => (d.cat ?? d.type ?? "").trim() !== "");
       data = hasCat ? base.filter(d => getCatLower(d) === "企業") : [];
+    } else if (initialKey === "itaku") {
+      const hasCat = base.some(d => (d.cat ?? d.type ?? "").trim() !== "");
+      data = hasCat ? base.filter(d => getCatLower(d) === "委託") : [];
     } else if (["A","B","C","D","E"].includes(initialKey)) {
       const re = new RegExp(`^${initialKey}`, "i");
       data = base.filter(d => re.test(String(d.space || "")));
-    }
+    } // "all" の場合は base のまま
 
     // テーブル描画
     const container = document.getElementById('circleList');
     container?.classList.remove('circle-list');
-//    const container = $("circleList");
     if (!container) return;
     container.innerHTML = "";
     container.style.overflowX = "auto";
@@ -661,33 +663,3 @@ function setSubControls(html, onClick, datasetKey = "data-scope", mode = window.
     run();
   }
 })();
-
-
-function setSubControls(view) {
-  const sub = document.getElementById("subControls");
-  sub.innerHTML = "";
-
-  let buttons = [];
-  if (view === "circle" || view === "table") {
-    buttons = ["すべて", "A", "B", "C", "D", "E", "企業", "委託"];
-  } else if (view === "kana") {
-    buttons = ["すべて", "あ", "か", "さ", "た", "な", "は", "ま", "や", "ら", "わ", "企業"];
-  }
-
-  buttons.forEach(label => {
-    const el = document.createElement("button");
-    el.textContent = label;
-    el.addEventListener("click", (ev) => {
-      const parent = ev.currentTarget.parentElement;
-      parent.querySelectorAll('button').forEach(b => {
-        b.classList.remove('ui-pill--active');
-        b.removeAttribute('aria-selected');
-        b.removeAttribute('aria-pressed');
-      });
-      el.classList.add('ui-pill--active');
-      el.setAttribute('aria-selected','true');
-      switchSub(label); // ← 表モードでも同一経路で実処理
-    });
-    sub.appendChild(el);
-  });
-}
