@@ -228,9 +228,10 @@ function setSubControls(html, onClick, datasetKey = "data-scope", mode = window.
 
     setSubControls(
       `<div role="group" aria-label="50音行フィルタ">
-        ${rows.map(r => `<button type="button" data-scope="${r}">${r}</button>`).join("")}
-        <button type="button" data-scope="corp">企業</button>
-        <button type="button" data-scope="all">すべて</button>
+      <button type="button" data-scope="all">すべて</button>
+      ${rows.map(r => `<button type="button" data-scope="${r}">${r}</button>`).join("")}
+      <button type="button" data-scope="corp">企業</button>
+
       </div>`,
       (key) => {
         window.__currentFilterKey = key;
@@ -287,11 +288,11 @@ function setSubControls(html, onClick, datasetKey = "data-scope", mode = window.
 
     setSubControls(
       `<div role="group" aria-label="スペース行フィルタ">
-        ${letters.map(L => `<button type=\"button\" data-scope=\"${L}\">${L}</button>`).join("")}
-        <button type="button" data-scope="corp">企業</button>
-        <button type="button" data-scope="itaku">委託</button>
-        <button type="button" data-scope="all">すべて</button>
-      </div>`,
+      <button type="button" data-scope="all">すべて</button>
+      ${letters.map(L => `<button type="button" data-scope="${L}">${L}</button>`).join("")}
+      <button type="button" data-scope="corp">企業</button>
+      <button type="button" data-scope="itaku">委託</button>
+    </div>`,
 
       (key) => {
         window.__currentFilterKey = key;
@@ -349,18 +350,25 @@ function setSubControls(html, onClick, datasetKey = "data-scope", mode = window.
     // サブボタン（フィルタ兼用）
     setSubControls(
       `<div role="group" aria-label="表表示フィルタ">
+        <button type="button" data-scope="all">すべて</button>
         <button type="button" data-scope="A">A</button>
         <button type="button" data-scope="B">B</button>
         <button type="button" data-scope="C">C</button>
         <button type="button" data-scope="D">D</button>
         <button type="button" data-scope="E">E</button>
         <button type="button" data-scope="corp">企業</button>
-        <button type="button" data-scope="all">すべて</button>
+        <button type="button" data-scope="itaku">委託</button>
       </div>`,
       (key) => renderPlainTable(key),
       "data-scope",
       "table"
     );
+    // 表表示でも初期選択のボタンを強調（.ui-pill--active）
+    {
+      const sub = ensureSubControls(window.__currentView);
+      const initBtn = sub?.querySelector(`[data-scope="${initialKey}"]`);
+      if (initBtn) initBtn.classList.add("ui-pill--active");
+    }
 
     // スペース順で安定ソート
     const base = [...getData()].sort((a, b) => compareSpaceStr(a.space || "", b.space || ""));
