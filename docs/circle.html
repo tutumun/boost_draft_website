@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <!--
+    サークル参加ガイド（Draft / v0.21）
+    - 仕様出典: boost-site-spec-v0.21-dev.md / boost-site-plan-v0.21-unit-with-tasks.md
+    - フロント限定（静的HTML+バニラCSS/JS）
+    - 本ページは https://boost-official.info/circle/ を参考に、最終文言は後で差し替える前提
+
+    実装メモ：
+    - 固定ナビ（横スクロール可）
+    - アンカー（見出し被り防止：scroll-margin-top）
+    - 単位表記の徹底（円／時刻／cm／脚 など）
+    - アクセシビリティ（コントラスト、フォーカス、スキップリンク）
+    - 依存なし（画像・外部CSS/JS未使用）
+  -->
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>サークル参加ガイド（Draft）| ブースト！</title>
+  <meta name="description" content="ブースト！同人イベントのサークル参加ガイド。参加資格、ブース仕様・料金、当日フロー、見本誌提出、委託・欠席連絡、注意事項、FAQ、問い合わせへの導線。" />
+  <style>
+    /* =============================
+       カラーパレット（5色以内）
+       ※ 本番でブランドカラーは調整予定
+    ============================== */
+    :root{
+      --brand: #0ea5e9;   /* メイン（空色） */
+      --text:  #111827;   /* 本文（濃いグレー） */
+      --muted: #6b7280;   /* 補助（薄いグレー） */
+      --bg:    #ffffff;   /* 背景（白） */
+      --line:  #e5e7eb;   /* 罫線（薄いグレー） */
+      --nav-h: 56px;      /* 固定ナビ高（見出しのscroll-margin計算用） */
+    }
+
+    /* 基本タイポ・レイアウト */
+    html{ scroll-behavior:smooth; }
+    body{
+      margin:0; color:var(--text); background:var(--bg); font-family: system-ui, -apple-system, "Segoe UI", Roboto, Noto Sans, "Hiragino Kaku Gothic ProN", "Yu Gothic", "Meiryo", sans-serif;
+      line-height:1.7; font-size:16px;
+    }
+    .container{ max-width: 1024px; margin: 0 auto; padding: 24px 16px; }
+    h1,h2,h3{ line-height:1.3; }
+    h1{ font-size: clamp(24px, 4vw, 32px); margin: 16px 0; }
+    h2{ font-size: clamp(20px, 3vw, 24px); margin: 32px 0 12px; scroll-margin-top: calc(var(--nav-h) + 16px); }
+    h3{ font-size: clamp(18px, 2.4vw, 20px); margin: 20px 0 8px; }
+    p{ margin: 8px 0; }
+    a{ color: var(--brand); text-decoration: none; }
+    a:focus, a:hover{ text-decoration: underline; }
+
+    /* スキップリンク（キーボード利用者向け） */
+    .skip-link{ position:absolute; left:-9999px; top:0; background:#000; color:#fff; padding:8px 12px; z-index:1000; }
+    .skip-link:focus{ left:8px; }
+
+    /* 固定ローカルナビ（横スクロール可） */
+    .local-nav{ position: sticky; top:0; z-index: 500; background: var(--bg); border-bottom:1px solid var(--line); height: var(--nav-h); display:flex; align-items:center; }
+    .local-nav__inner{ display:flex; gap:8px; overflow-x:auto; white-space:nowrap; padding: 8px 12px; }
+    .chip{ display:inline-flex; align-items:center; height: 36px; padding:0 12px; border:1px solid var(--line); border-radius:18px; background:#fff; color:var(--text); font-size:14px; }
+    .chip[aria-current="true"], .chip.active{ border-color: var(--brand); box-shadow: inset 0 0 0 2px color-mix(in oklab, var(--brand) 30%, transparent); }
+    .chip:focus{ outline: 2px solid var(--brand); outline-offset:2px; }
+
+    /* ヒーロー（ページ見出し部） */
+    .hero{ padding: 12px 0 0; border-bottom:1px solid var(--line); }
+    .hero__lead{ color: var(--muted); margin: 4px 0 16px; }
+    .hero__cta{ display:flex; gap:8px; flex-wrap:wrap; margin: 16px 0 8px; }
+    .btn{ display:inline-flex; align-items:center; gap:8px; height:40px; padding:0 16px; border-radius:8px; border:1px solid var(--line); background:#fff; color:var(--text); text-decoration:none; }
+    .btn--primary{ background: var(--brand); color:#fff; border-color: transparent; }
+
+    /* セクション装飾 */
+    section{ padding: 8px 0 16px; border-bottom: 1px solid var(--line); }
+    .note{ font-size: 14px; color: var(--muted); }
+
+    /* 表（料金・仕様） */
+    .table{ width:100%; border-collapse: collapse; }
+    .table th, .table td{ border:1px solid var(--line); padding:10px 12px; text-align:left; vertical-align:top; }
+    .table th{ background: #f8fafc; font-weight:600; }
+
+    /* タイムライン風リスト（当日フロー） */
+    .flow{ list-style:none; padding:0; margin: 0; }
+    .flow li{ display:grid; grid-template-columns: 120px 1fr; gap:12px; padding:12px 0; border-bottom:1px dashed var(--line); }
+    .flow time{ font-variant-numeric: tabular-nums; font-weight:600; }
+
+    /* FAQ（詳細は後日拡張想定） */
+    details{ border:1px solid var(--line); border-radius:8px; padding: 10px 12px; margin: 8px 0; }
+    summary{ cursor:pointer; }
+
+    /* フッターメモ */
+    footer{ color: var(--muted); font-size: 14px; padding: 16px 0 48px; }
+
+    /* 小画面最適化 */
+    @media (max-width: 640px){
+      .flow li{ grid-template-columns: 88px 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <!-- キーボード操作で主要コンテンツへ飛べるようにする配慮 -->
+  <a class="skip-link" href="#main">本文へスキップ</a>
+
+  <!-- 固定ローカルナビ：横スクロール可能。クリックで各セクションへ移動 -->
+  <nav class="local-nav" aria-label="サークル参加ガイド内メニュー">
+    <div class="local-nav__inner">
+      <!-- aria-current はJSのスクロールスパイで動的切替 -->
+      <a class="chip" href="#eligibility">参加資格</a>
+      <a class="chip" href="#booth">ブース仕様・料金</a>
+      <a class="chip" href="#apply">申込要領</a>
+      <a class="chip" href="#day-flow">当日フロー</a>
+      <a class="chip" href="#sample">見本誌提出</a>
+      <a class="chip" href="#proxy">委託・欠席連絡</a>
+      <a class="chip" href="#rules">注意事項</a>
+      <a class="chip" href="#faq">FAQ</a>
+      <a class="chip" href="#contact">問い合わせ</a>
+    </div>
+  </nav>
+
+  <main id="main" class="container" data-spy-root>
+    <!-- ページ見出し。最上部に概要とCTAを配置（仕様の“短文・箇条書き”方針） -->
+    <header class="hero" role="banner">
+      <h1>サークル参加ガイド（Draft）</h1>
+      <p class="hero__lead">参加資格、ブース仕様・料金、当日フロー、見本誌提出、委託・欠席、注意事項などをまとめています。数字はすべて単位付きで表記します。</p>
+      <div class="hero__cta" role="group" aria-label="主要アクション">
+        <!-- TODO: URL確定後に差し替え。target/_blank + rel=noopener はセキュリティ配慮 -->
+        <a class="btn btn--primary" href="#apply">申込へ進む</a>
+        <a class="btn" href="#faq">よくある質問</a>
+        <a class="btn" href="#contact">お問い合わせ</a>
+      </div>
+    </header>
+
+    <!-- 1) 参加資格 -->
+    <section id="eligibility" data-spy-section>
+      <h2>参加資格</h2>
+      <ul>
+        <li>同人誌・グッズ等の<strong>自主制作物</strong>を頒布できる個人・団体。</li>
+        <li><strong>18歳未満</strong>は保護者の同意が必要。</li>
+        <li>商業委託・企業出展は<strong>別枠申請</strong>（詳細は後日案内）。</li>
+      </ul>
+      <p class="note">※最終版では <em>https://boost-official.info/circle/</em> の最新記載に合わせて確定します。</p>
+    </section>
+
+    <!-- 2) ブース仕様・料金 -->
+    <section id="booth" data-spy-section>
+      <h2>ブース仕様・料金</h2>
+      <table class="table" aria-describedby="booth-desc">
+        <tbody>
+          <tr>
+            <th scope="row">ブース構成</th>
+            <td>机<strong>1/2</strong>（幅<strong>90cm</strong> × 奥行<strong>45cm</strong>）＋ 椅子<strong>1脚</strong></td>
+          </tr>
+          <tr>
+            <th scope="row">参加費</th>
+            <td><strong>1ブース 5,000円</strong>（税込）</td>
+          </tr>
+          <tr>
+            <th scope="row">追加椅子</th>
+            <td><strong>1脚 500円</strong>（最大<strong>2脚</strong>まで）</td>
+          </tr>
+          <tr>
+            <th scope="row">電源</th>
+            <td>会場都合により<strong>未提供</strong>（持込バッテリーは安全基準を遵守）</td>
+          </tr>
+        </tbody>
+      </table>
+      <p id="booth-desc" class="note">※ 寸法・金額はドラフト値。確定後に更新します。</p>
+    </section>
+
+    <!-- 3) 申込要領（エントリー方法、支払い、締切等の枠だけ用意） -->
+    <section id="apply" data-spy-section>
+      <h2>申込要領</h2>
+      <ol>
+        <li>募集開始：<strong>YYYY/MM/DD HH:MM</strong>（予定）</li>
+        <li>応募方法：<strong>フォーム</strong>より必要事項を送信</li>
+        <li>当落連絡：<strong>YYYY/MM/DD</strong> までにメール通知</li>
+        <li>参加費支払い：<strong>YYYY/MM/DD</strong> まで（銀行振込／オンライン決済）</li>
+      </ol>
+      <p class="note">※ 具体的な日付・決済方法は確定後にご案内します。</p>
+      <div class="hero__cta" role="group" aria-label="申込導線">
+        <!-- TODO: 申込フォームURLが確定次第差し替え -->
+        <a class="btn btn--primary" href="#">申込フォーム（準備中）</a>
+        <a class="btn" href="#rules">注意事項を読む</a>
+      </div>
+    </section>
+
+    <!-- 4) 当日フロー（タイムライン） -->
+    <section id="day-flow" data-spy-section>
+      <h2>当日フロー</h2>
+      <ul class="flow">
+        <li><time datetime="09:30">09:30</time><div>搬入開始（スタッフ案内に従い、通路を塞がないようご配慮ください）</div></li>
+        <li><time datetime="10:00">10:00</time><div>サークル入場開始（見本誌提出の準備／年齢確認シール）</div></li>
+        <li><time datetime="11:00">11:00</time><div>一般開場（通路確保・声出しの音量配慮）</div></li>
+        <li><time datetime="16:00">16:00</time><div>頒布終了〜撤収（忘れ物・ゴミの最終確認）</div></li>
+        <li><time datetime="17:00">17:00</time><div>完全撤収（机・椅子の原状復帰）</div></li>
+      </ul>
+      <p class="note">※ 時刻はドラフト。会場スケジュール確定後に更新します（例：<strong>09:30〜10:30</strong> のように範囲表記も単位併記）。</p>
+    </section>
+
+    <!-- 5) 見本誌提出（成人向けの扱い含む） -->
+    <section id="sample" data-spy-section>
+      <h2>見本誌提出</h2>
+      <ul>
+        <li>開場前に「<strong>見本誌受付</strong>」で<strong>1冊</strong>提出。</li>
+        <li>成人向け作品は表紙に<strong>年齢確認シール</strong>を貼付（受付で配布）。</li>
+        <li>禁止物：<strong>無断転載・公序良俗に反する物</strong>・法令違反の恐れがある物。</li>
+      </ul>
+      <p class="note">※ 詳細ルールは最終版の規約に統合予定。</p>
+    </section>
+
+    <!-- 6) 委託・欠席連絡 -->
+    <section id="proxy" data-spy-section>
+      <h2>委託・欠席連絡</h2>
+      <h3>委託参加</h3>
+      <ul>
+        <li>事前登録制。点数・数量・売上精算の方法は<strong>要項</strong>で告知。</li>
+        <li>成人向けの取り扱いは通常と同様に年齢区分を遵守。</li>
+      </ul>
+      <h3>欠席連絡</h3>
+      <ul>
+        <li>欠席が判明した時点で<strong>速やかに連絡</strong>（フォーム or メール）。</li>
+        <li>無断欠席は次回以降の参加をお断りする場合があります。</li>
+      </ul>
+    </section>
+
+    <!-- 7) 注意事項（会場運用・安全） -->
+    <section id="rules" data-spy-section>
+      <h2>注意事項</h2>
+      <ul>
+        <li>ブース前通路は<strong>常に確保</strong>。荷物は足下にまとめる。</li>
+        <li>火気・騒音・強い光を用いる展示は<strong>禁止</strong>。</li>
+        <li>ゴミは<strong>各自持ち帰り</strong>。会場の美観維持にご協力ください。</li>
+        <li><strong>撮影可否</strong>は被写体の同意がある場合に限る（総合ルールに準拠）。</li>
+      </ul>
+    </section>
+
+    <!-- 8) FAQ（最低ひな形。5〜10件に拡張予定） -->
+    <section id="faq" data-spy-section>
+      <h2>FAQ（よくある質問）</h2>
+      <details>
+        <summary>申込後のキャンセルは可能ですか？</summary>
+        <p>締切<strong>前</strong>であればキャンセル可能です。締切<strong>後</strong>は参加費の返金はできません。</p>
+      </details>
+      <details>
+        <summary>宅配搬入は利用できますか？</summary>
+        <p>会場許可の範囲で受付予定です。伝票の書式・到着日時は要項で案内します。</p>
+      </details>
+      <details>
+        <summary>成人向け頒布の確認方法は？</summary>
+        <p>年齢確認バンド等で管理します。スタッフの指示に従ってください。</p>
+      </details>
+    </section>
+
+    <!-- 9) 問い合わせ（GitHub Issueフォーム想定。仕様v0.2準拠） -->
+    <section id="contact" data-spy-section>
+      <h2>問い合わせ</h2>
+      <p>不具合報告・改善要望は<strong>GitHub Issueフォーム</strong>へお願いします（<span class="note">個別返信なし・公開前提・個人情報記載不可</span>）。</p>
+      <div class="hero__cta" role="group" aria-label="問い合わせ導線">
+        <!-- TODO: 本番URL確定後に置換。新規タブで開く -->
+        <a class="btn btn--primary" href="#" target="_blank" rel="noopener">GitHub Issueフォーム（準備中）</a>
+        <a class="btn" href="#top">ページ上部へ</a>
+      </div>
+    </section>
+
+    <footer>
+      <p>このページはドラフト版（v0.21）。時刻・料金・寸法などは確定後に更新します。</p>
+    </footer>
+  </main>
+
+  <script>
+    // ============================
+    // スクロールスパイ（現在地ハイライト）
+    // - IntersectionObserver で各 section の可視領域を監視
+    // - 最も手前のセクションに対応する .chip に aria-current=true を付与
+    // - a11y上、aria-current="true" で現在地を支援
+    // ============================
+    (function(){
+      const sections = Array.from(document.querySelectorAll('[data-spy-section]'));
+      const chips = Array.from(document.querySelectorAll('.local-nav .chip'));
+      const byId = (id) => chips.find(a => a.getAttribute('href') === `#${id}`);
+
+      // 可視割合が大きい順に現在地を決めるための状態
+      let visible = new Map();
+
+      const io = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          const id = entry.target.id;
+          visible.set(id, entry.intersectionRatio);
+        });
+        // 可視率が最大のセクションを現在地に
+        const current = Array.from(visible.entries())
+          .sort((a,b) => b[1] - a[1])
+          .map(([id]) => id)[0];
+        if(current){
+          chips.forEach(c => c.removeAttribute('aria-current'));
+          const now = byId(current);
+          if(now) now.setAttribute('aria-current','true');
+        }
+      },{ rootMargin: `-${getComputedStyle(document.documentElement).getPropertyValue('--nav-h').trim()} 0px -60% 0px`, threshold: buildThresholdList() });
+
+      sections.forEach(s => io.observe(s));
+
+      // しきい値を細かく設定（滑らかな判定）
+      function buildThresholdList(){
+        const t = [];
+        for(let i=0; i<=1.0; i+=0.1){ t.push(i); }
+        return t;
+      }
+
+      // ナビクリック時にフォーカスリングを合わせてアクセシビリティ向上
+      chips.forEach(link => link.addEventListener('click', () => {
+        // 次のフレームでフォーカス移動（スクロール完了後にh2へ）
+        const id = link.getAttribute('href').slice(1);
+        const target = document.getElementById(id);
+        if(target){
+          setTimeout(() => target.focus?.(), 200);
+        }
+      }));
+    })();
+  </script>
+</body>
+</html>
