@@ -273,6 +273,7 @@ function setSubControls(html, onClick, datasetKey = "data-scope", mode = window.
       }
       return sortedAll.filter(d => rowKeyForRecord(d) === key);
     }
+    document.getElementById('circleList')?.classList.add('circle-list');
   }
 
   // スペース順表示（カード）★不足していたため追加
@@ -335,6 +336,8 @@ function setSubControls(html, onClick, datasetKey = "data-scope", mode = window.
     const sub = ensureSubControls(window.__currentView);
     const initBtn = sub.querySelector(`[data-scope="${initialKey}"]`);
     if (initBtn) initBtn.classList.add("ui-pill--active");
+
+    document.getElementById('circleList')?.classList.add('circle-list');
   }
 
   // 表表示（プレーンテーブル）
@@ -373,7 +376,9 @@ function setSubControls(html, onClick, datasetKey = "data-scope", mode = window.
     }
 
     // テーブル描画
-    const container = $("circleList");
+    const container = document.getElementById('circleList');
+    container?.classList.remove('circle-list');
+//    const container = $("circleList");
     if (!container) return;
     container.innerHTML = "";
     container.style.overflowX = "auto";
@@ -460,6 +465,8 @@ function setSubControls(html, onClick, datasetKey = "data-scope", mode = window.
     toggleLoadMore(false);
 
     console.log(`[renderPlainTable] key=${initialKey}, colWidths=${COLS.join(",")}, total=${totalWidth}px`);
+    
+    document.getElementById('circleList')?.classList.add('circle-list');
   }
   window.renderPlainTable = renderPlainTable;
 
@@ -469,6 +476,8 @@ function setSubControls(html, onClick, datasetKey = "data-scope", mode = window.
 
   /** デフォルト表示：space有→サークル順A／全空→五十音あ */
   function initView() {
+    // 旧サブ行が残っていた場合に備えて排除（従来処理の干渉を防止）
+    document.querySelectorAll('.sub-switch, #sub-switch-space, #sub-switch-kana, #sub-switch-table').forEach(el => el.remove?.());
     try {
       const data = getData();
       const hasSpace = Array.isArray(data) && data.some(d => (d?.space ?? "").toString().trim() !== "");
@@ -660,7 +669,17 @@ function setSubControls(view) {
   buttons.forEach(label => {
     const el = document.createElement("button");
     el.textContent = label;
-    el.addEventListener("click", () => switchSub(label));
+    el.addEventListener("click", (ev) => {
+      const parent = ev.currentTarget.parentElement;
+      parent.querySelectorAll('button').forEach(b => {
+        b.classList.remove('ui-pill--active');
+        b.removeAttribute('aria-selected');
+        b.removeAttribute('aria-pressed');
+      });
+      el.classList.add('ui-pill--active');
+      el.setAttribute('aria-selected','true');
+      switchSub(label); // ← 表モードでも同一経路で実処理
+    });
     sub.appendChild(el);
   });
 }
