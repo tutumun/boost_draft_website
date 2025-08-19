@@ -473,6 +473,59 @@
     }
   });
 
+//!-- =========================================================
+//ファイル: docs/circles-view.js（抜粋）
+//変更点: 初期状態でデフォルトの「サークル順」を強調表示。
+//========================================================= -->
+  const setActive = (btn, groupSelector = ".mode-switch") => {
+const group = btn.closest(groupSelector) || document;
+group.querySelectorAll('.ui-pill').forEach(el => {
+el.classList.remove('ui-pill--active');
+if (el.hasAttribute('aria-selected')) el.setAttribute('aria-selected', 'false');
+if (el.hasAttribute('aria-pressed')) el.setAttribute('aria-pressed', 'false');
+});
+btn.classList.add('ui-pill--active');
+if (btn.hasAttribute('aria-selected')) btn.setAttribute('aria-selected', 'true');
+if (btn.hasAttribute('aria-pressed')) btn.setAttribute('aria-pressed', 'true');
+};
+
+
+const modeButtons = document.querySelectorAll('.js-mode-btn');
+modeButtons.forEach(btn => {
+btn.addEventListener('click', (e) => {
+const target = e.currentTarget;
+const mode = target.dataset.mode;
+setActive(target, '.mode-switch');
+if (typeof window.switchViewMode === 'function') {
+window.switchViewMode(mode);
+}
+});
+});
+
+
+const subButtons = document.querySelectorAll('.js-sub-btn');
+subButtons.forEach(btn => {
+btn.addEventListener('click', (e) => {
+const target = e.currentTarget;
+setActive(target, '.sub-switch');
+const scope = target.dataset.scope;
+if (typeof window.filterCircles === 'function') {
+window.filterCircles(scope);
+}
+});
+});
+
+
+const syncInitialActive = (containerSel) => {
+document.querySelectorAll(containerSel).forEach(container => {
+const selected = container.querySelector('.ui-pill[aria-selected="true"], .ui-pill[aria-pressed="true"], .ui-pill.ui-pill--active');
+if (selected) setActive(selected, containerSel);
+});
+};
+
+
+syncInitialActive('.mode-switch');
+syncInitialActive('.sub-switch');
   // グローバル公開（inline onclick対策）
   window.renderKanaView   = window.renderKanaView   || renderKanaView;
   window.renderSpaceView  = window.renderSpaceView  || renderSpaceView;

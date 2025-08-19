@@ -268,3 +268,31 @@ nav.site-nav,
 #circleList thead th { background: #f8fafc; font-weight: 600; }
 #circleList tr:last-child th,
 #circleList tr:last-child td { border-bottom: none; }
+
+.ui-pill--active,
+.ui-pill[aria-selected="true"],
+.ui-pill[aria-pressed="true"] {
+background: var(--brand);
+border-color: var(--brand);
+color: var(--brand-ink);
+font-weight: 700; /* 太字で強調 */
+box-shadow: 0 0 0 2px rgba(78,124,255,.35); /* 強めのリング */
+}
+
+.ui-pill { font-weight: 700; }
+.ui-pill--active,
+.ui-pill[aria-selected="true"],
+.ui-pill[aria-pressed="true"] {
+/* ナビと同トーン + 強めのアウトラインで“いま選択中”を明確化 */
+background: var(--brand);
+border-color: var(--brand);
+color: var(--brand-ink);
+box-shadow: 0 0 0 2px rgba(78,124,255,.38), var(--shadow-sm);
+}
+@media (prefers-color-scheme: dark) {
+.ui-pill--active,
+.ui-pill[aria-selected="true"],
+.ui-pill[aria-pressed="true"] {
+box-shadow: 0 0 0 2px rgba(78,124,255,.55), var(--shadow-sm);
+}
+}
