@@ -4,10 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ブースト！公式サイト</title>
-  <!-- 現在のディレクトリ構成に合わせてパスのみ調整（デザイン・内容は変更しない） -->
+  <!-- パスは現行構成に合わせる（必要に応じて調整） -->
   <link rel="stylesheet" href="assets/scr/site.css"><!-- 旧: site.css -->
-  <script src="assets/scr/circles-cards.js" defer></script><!-- 旧: circles-cards.js -->
-  <script src="assets/scr/circles-view.js" defer></script><!-- 旧: circles-view.js -->
+  <script src="assets/scr/circles-cards.js" defer></script>
+  <script src="assets/scr/circles-view.js" defer></script>
 </head>
 <body>
   <!-- ナビゲーション（そのまま） -->
@@ -84,33 +84,27 @@
     </ul>
   </section>
 
-  <!-- サークル一覧（そのまま。#circleList はJSの描画ターゲット） -->
+  <!-- サークル一覧 -->
   <section id="circles" class="section">
-  <h2>サークル一覧</h2>
+    <h2>サークル一覧</h2>
 
-
-    <!-- ▼ 表示モード切替（サークル順 / 五十音順 / 表） -->
-    <div class="mode-switch" role="tablist" aria-label="表示モード切替">
-      <!-- 順番は「サークル順 → 50音順 → 表表示」 -->
-      <button class="ui-pill js-mode-btn" data-mode="space" aria-selected="true" role="tab" id="tab-space">
-      サークル順
-      </button>
-      <button class="ui-pill js-mode-btn" data-mode="kana" aria-selected="false" role="tab" id="tab-kana">
-      50音順
-      </button>
-      <button class="ui-pill js-mode-btn" data-mode="table" aria-selected="false" role="tab" id="tab-table">
-      表表示
-      </button>
+    <!-- ▼ 表示モード切替（ロード完了まで非表示） -->
+    <div id="viewControls" class="is-hidden"><!-- ★追加: ラッパーで制御しやすく -->
+      <div class="mode-switch" role="tablist" aria-label="表示モード切替">
+        <button class="ui-pill js-mode-btn" data-mode="space" aria-selected="true" role="tab" id="tab-space">サークル順</button>
+        <button class="ui-pill js-mode-btn" data-mode="kana" aria-selected="false" role="tab" id="tab-kana">50音順</button>
+        <button class="ui-pill js-mode-btn" data-mode="table" aria-selected="false" role="tab" id="tab-table">表表示</button>
+      </div>
     </div>
 
+    <!-- ▼ 新サブボタン用コンテナ（ロード完了まで非表示） -->
+    <div id="subControls" class="is-hidden" aria-label="範囲切替"></div>
 
-    <!-- ▼ サブフィルタ（例）必要に応じて `.ui-pill` を付与して見た目統一 -->
-    <div class="sub-switch" aria-label="範囲切替">
-      <button class="ui-pill js-sub-btn" data-scope="all" aria-pressed="true">すべて</button>
-    </div>
+    <!-- ▼ 旧サブフィルタ（削除済み）
+         sub-switch-space / -kana / -table は JS生成へ移行したため廃止 -->
 
-
-    <div id="circles-view"></div>
+    <!-- ▼ 描画エリア（cards / kana / table いずれもここへ描画） -->
+    <div id="circleList"></div>
   </section>
   
   <!-- 配置図（そのまま） -->
@@ -144,6 +138,8 @@
     <p>不明点はGitHub Issueフォームよりお問い合わせください。</p>
     <a href="https://github.com/tutumun/boost_draft_website/issues/new" target="_blank" rel="noopener" class="btn">問い合わせフォーム</a>
   </section>
+
+  <!-- ▼ ヒーローのフライヤー注入（そのまま） -->
   <script>
   (function () {
     'use strict';
@@ -161,25 +157,10 @@
           justify-content: space-between;
           gap: 24px;
         }
-        .hero-left {
-          flex: 0 0 auto;
-          max-width: 360px;
-        }
-        .hero-left .flyer-img {
-          display: block;
-          width: 100%;
-          height: auto;
-          border-radius: 12px;
-          box-shadow: 0 4px 16px rgba(0,0,0,.12);
-        }
-        .hero-right {
-          flex: 1 1 auto;
-          min-width: 0;
-        }
-        @media (max-width: 880px) {
-          .hero-flex { flex-direction: column; }
-          .hero-left { max-width: none; }
-        }
+        .hero-left { flex: 0 0 auto; max-width: 360px; }
+        .hero-left .flyer-img { display: block; width: 100%; height: auto; border-radius: 12px; box-shadow: 0 4px 16px rgba(0,0,0,.12); }
+        .hero-right { flex: 1 1 auto; min-width: 0; }
+        @media (max-width: 880px) { .hero-flex { flex-direction: column; } .hero-left { max-width: none; } }
       `;
       const style = document.createElement('style');
       style.id = id;
@@ -187,10 +168,7 @@
       document.head.appendChild(style);
     }
 
-    function getHeroRoot() {
-      return document.querySelector('header.hero') || document.querySelector('.hero');
-    }
-
+    function getHeroRoot() { return document.querySelector('header.hero') || document.querySelector('.hero'); }
     function createFlyerImg() {
       const img = document.createElement('img');
       img.className = 'flyer-img';
@@ -200,58 +178,64 @@
       img.decoding = 'async';
       return img;
     }
-
     function mountFlyer() {
       const hero = getHeroRoot();
       if (!hero) return;
       if (hero.querySelector('.hero-flex')) return;
-
-      const left  = document.createElement('div');
-      left.className = 'hero-left';
-      left.appendChild(createFlyerImg());
-
-      const right = document.createElement('div');
-      right.className = 'hero-right';
-      const nodes = Array.from(hero.childNodes);
-      nodes.forEach(n => right.appendChild(n));
-
-      const wrap = document.createElement('div');
-      wrap.className = 'hero-flex';
-      wrap.appendChild(left);
-      wrap.appendChild(right);
-
+      const left  = document.createElement('div'); left.className = 'hero-left'; left.appendChild(createFlyerImg());
+      const right = document.createElement('div'); right.className = 'hero-right';
+      const nodes = Array.from(hero.childNodes); nodes.forEach(n => right.appendChild(n));
+      const wrap = document.createElement('div'); wrap.className = 'hero-flex'; wrap.appendChild(left); wrap.appendChild(right);
       hero.appendChild(wrap);
     }
-
-    function onReady() {
-      injectStyle();
-      mountFlyer();
-    }
-
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', onReady);
-    } else {
-      onReady();
-    }
+    function onReady() { injectStyle(); mountFlyer(); }
+    if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', onReady); } else { onReady(); }
   })();
-</script>
-<script>
-(() => {
-// 既存IIFEの外からも呼べるAPI。例: switchViewMode('kana') 完了後に setModeActive('kana')
-window.setModeActive = (mode) => {
-const target = document.querySelector(`.js-mode-btn[data-mode="${mode}"]`);
-if (!target) return;
-const group = target.closest('.mode-switch') || document;
-group.querySelectorAll('.ui-pill').forEach(el => {
-el.classList.remove('ui-pill--active');
-if (el.hasAttribute('aria-selected')) el.setAttribute('aria-selected', 'false');
-if (el.hasAttribute('aria-pressed')) el.setAttribute('aria-pressed', 'false');
-});
-target.classList.add('ui-pill--active');
-if (target.hasAttribute('aria-selected')) target.setAttribute('aria-selected', 'true');
-if (target.hasAttribute('aria-pressed')) target.setAttribute('aria-pressed', 'true');
-};
-})();
-</script>
+  </script>
+
+  <!-- ▼ モードの見た目更新API（そのまま） -->
+  <script>
+  (() => {
+    // 既存IIFEの外からも呼べるAPI。例: switchViewMode('kana') 完了後に setModeActive('kana')
+    window.setModeActive = (mode) => {
+      const target = document.querySelector(`.js-mode-btn[data-mode="${mode}"]`);
+      if (!target) return;
+      const group = target.closest('.mode-switch') || document;
+      group.querySelectorAll('.ui-pill').forEach(el => {
+        el.classList.remove('ui-pill--active');
+        if (el.hasAttribute('aria-selected')) el.setAttribute('aria-selected', 'false');
+        if (el.hasAttribute('aria-pressed')) el.setAttribute('aria-pressed', 'false');
+      });
+      target.classList.add('ui-pill--active');
+      if (target.hasAttribute('aria-selected')) target.setAttribute('aria-selected', 'true');
+      if (target.hasAttribute('aria-pressed')) target.setAttribute('aria-pressed', 'true');
+    };
+  })();
+  </script>
+
+  <!-- ▼ モード切替の実処理（そのまま） -->
+  <script>
+  // モード切替の実処理を一本化。
+  // コメント: クリックで .ui-pill の見た目は変わっても、
+  // 実データ描画は各レンダラ呼び出しが必要です。
+  window.switchViewMode = function(mode){
+    try {
+      if (mode === 'space') {
+        renderSpaceView('A'); // サークル順：A から
+      } else if (mode === 'kana') {
+        renderKanaView('あ'); // 50音：あ行から
+      } else if (mode === 'table') {
+        renderPlainTable('all'); // 表：すべて
+      }
+    } catch (e) { console.error('[switchViewMode] failed:', e); }
+  };
+  </script>
+
+  <!-- 更新メモ:
+    - 旧サブボタン群 (sub-switch-space / -kana / -table) を削除
+    - 新しいサブボタン用の空コンテナ <div id="subControls" class="is-hidden"> を追加
+    - モード切替一式を <div id="viewControls" class="is-hidden"> でラップ（ロード完了まで非表示）
+    - 実際のボタン生成は circles-view.js の setSubControls(view) が行います
+  -->
 </body>
 </html>

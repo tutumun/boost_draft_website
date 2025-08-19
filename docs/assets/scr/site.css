@@ -1,7 +1,9 @@
 /* =========================================
-   ブースト！公式サイト 共通スタイル（完全版）
-   ※ デザイン・内容は HTML に準拠。HTMLは変更せず、
-     現行のマークアップ（クラス名/ID）に合わせて見た目のみ定義。
+   ブースト！公式サイト 共通スタイル（v0.21 修正統合版）
+   - 追加点: --brand / --brand-ink / --shadow-sm を:rootに定義
+             ナビ風ボタン共通クラス .ui-pill のベース＆アクティブを追加
+             モード切替コンテナ .mode-switch / .sub-switch を整列
+   - 既存の見た目は維持しつつ、サークル表示タブの強調が確実に効くように調整
    ========================================= */
 
 /* ---------- CSS変数（配色・余白・幅） ---------- */
@@ -9,19 +11,24 @@
   --bg: #ffffff;                 /* 背景色 */
   --fg: #222222;                 /* 文字色 */
   --muted: #666666;              /* 補助テキスト色 */
-  --primary: #1f6feb;            /* ボタンなどのアクセント */
+  --primary: #1f6feb;            /* 既存のアクセント色 */
   --primary-fg: #ffffff;         /* アクセント上の文字色 */
   --border: #e5e7eb;             /* 罫線色 */
   --card: #ffffff;               /* カード背景 */
   --shadow: 0 2px 10px rgba(0,0,0,.06); /* カード影 */
   --radius: 10px;                /* 角丸 */
-  --maxw: 960px;                 /* 本文の最大幅（必要に応じて調整可） */
+  --maxw: 960px;                 /* 本文の最大幅 */
   --space-1: .25rem;             /* 余白スケール */
   --space-2: .5rem;
   --space-3: .75rem;
   --space-4: 1rem;
   --space-5: 1.5rem;
   --space-6: 2rem;
+
+  /* ▼ 追加（pillボタン強調用トークン） */
+  --brand: var(--primary);       /* pillの塗りつぶし色 = 既存primaryを流用 */
+  --brand-ink: #ffffff;          /* pill上の文字色 */
+  --shadow-sm: 0 1px 2px rgba(0,0,0,.06);
 }
 
 /* ---------- ベースリセット（軽め） ---------- */
@@ -35,7 +42,7 @@ body {
   line-height: 1.7;
 }
 img { max-width: 100%; height: auto; vertical-align: middle; }
-a { color: var(--primary); text-decoration: none; }
+ a { color: var(--primary); text-decoration: none; }
 a:hover { text-decoration: underline; }
 
 /* 共通レイアウト：ページ要素の幅制限 */
@@ -91,39 +98,34 @@ section table tr:last-child th, section table tr:last-child td { border-bottom: 
 .view-controls { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; margin-bottom: var(--space-3); }
 .view-controls span { color: var(--muted); }
 
-/* ---------- サークル一覧：カードグリッド ---------- */
+/* ▼ 追加：上部の表示モード切替/サブ切替の横並び＆スクロール耐性 */
+.mode-switch,
+.sub-switch { display:flex; flex-wrap:nowrap; gap:.5rem; overflow-x:auto; padding:.5rem 0; }
+
+/* ---------- サークル一覧：カードグリッド（新規に使わない場合は無害） ---------- */
 .circle-list { display: grid; gap: var(--space-3); grid-template-columns: repeat(1, minmax(0, 1fr)); }
 @media (min-width: 560px) { .circle-list { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (min-width: 880px) { .circle-list { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-
-/* カード全体を2カラムに分割：左にサークルカット、右に情報 */
-.circle-list .card {
+.circle-list .card { /* 未使用でも既存互換のため残置 */
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   display: grid;
-  grid-template-columns: 120px 1fr; /* 左：画像固定幅／右：可変 */
+  grid-template-columns: 120px 1fr;
   gap: var(--space-3);
   padding: var(--space-3);
   align-items: start;
 }
-.circle-list .card img.cut {
-  width: 100%;
-  height: auto;
-  border-radius: var(--radius);
-  object-fit: cover;
-}
+.circle-list .card img.cut { width: 100%; height: auto; border-radius: var(--radius); object-fit: cover; }
 .circle-list .card .info { display: flex; flex-direction: column; gap: .35rem; }
 .circle-list .card .info .name { font-size: 1.05rem; font-weight: 700; }
 .circle-list .card .info .space { font-weight: 700; color: var(--primary); }
 .circle-list .card .info .pn { color: var(--muted); }
-
-/* SNSリンクを横並びでアイコン表示 */
 .circle-list .card .info .sns { display: flex; gap: .5rem; margin-top: .25rem; }
 .circle-list .card .info .sns a img { width: 20px; height: 20px; border-radius: 4px; display: block; }
 
-/* ---------- サークル一覧：表表示（renderTable用） ---------- */
+/* ---------- サークル一覧：表表示（renderPlainTable用） ---------- */
 #circleList table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); }
 #circleList thead th { background: #f8fafc; font-weight: 600; }
 #circleList th, #circleList td { border-bottom: 1px solid var(--border); padding: .6rem .75rem; text-align: left; }
@@ -153,146 +155,171 @@ section { margin-bottom: var(--space-6); }
 }
 
 /* ================================
-   サークルカードのスタイル（旧カード互換）
+   サークルカード（circles-cards.js が生成する .circle-card 用）
    ================================ */
 .circle-card {
   display: flex;
   gap: 12px;
   align-items: flex-start;
-  border: 1px solid #ccc;   /* 枠線 */
-  padding: 12px;            /* 内側余白 */
-  margin-bottom: 16px;      /* 下に余白 */
-  border-radius: 6px;       /* 角丸 */
-  background-color: #fff;   /* 背景色 */
+  border: 1px solid #ccc;     /* 枠線 */
+  padding: 12px;              /* 内側余白 */
+  margin-bottom: 16px;        /* 下に余白 */
+  border-radius: 6px;         /* 角丸 */
+  background-color: #fff;     /* 背景色 */
   box-shadow: 0 2px 4px rgba(0,0,0,0.05); /* ほんのり影 */
 }
-
-/* サークルカット部分 */
-.circle-card .thumb img {
-  display: block;
-  max-width: 160px;
-  height: auto;
-  border-radius: 4px;  /* 画像も少し角丸に */
-}
-
-/* 右側の情報部分 */
-.circle-card .meta {
-  flex: 1 1 auto;
-}
-
-/* サークル名やスペース番号など */
-.circle-card .name {
-  font-weight: bold;
-  font-size: 1.1em;
-  margin-bottom: 4px;
-}
-
-.circle-card .space {
-  font-size: 0.95em;
-  color: #333;
-  margin-bottom: 2px;
-}
-
-.circle-card .pn {
-  font-size: 0.9em;
-  color: #555;
-  margin-bottom: 6px;
-}
-
-/* SNSアイコン部分 */
-.circle-card .sns {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-.circle-card .sns img {
-  width: 20px;
-  height: 20px;
-  display: block;
-}
+.circle-card .thumb img { display: block; max-width: 160px; height: auto; border-radius: 4px; }
+.circle-card .meta { flex: 1 1 auto; }
+.circle-card .name { font-weight: bold; font-size: 1.1em; margin-bottom: 4px; }
+.circle-card .space { font-size: 0.95em; color: #333; margin-bottom: 2px; }
+.circle-card .pn { font-size: 0.9em; color: #555; margin-bottom: 6px; }
+.circle-card .sns { display: flex; gap: 8px; align-items: center; }
+.circle-card .sns img { width: 20px; height: 20px; display: block; }
 
 /* ================================
    ナビゲーション固定（テーマ差異吸収用）
    ================================ */
-/* ▼あなたのナビ要素のセレクタに合わせて、必要な方だけ残してください */
 header.global-nav,
 nav.global-nav,
 nav.site-nav,
 #siteNav {
-  position: sticky;      /* スクロールに追従して固定 */
-  top: 0;                /* 画面上端に張り付く */
-  z-index: 1000;         /* コンテンツより手前に表示（数値は環境に応じ調整可） */
-  background: #fff;      /* 背景を白で塗って下のコンテンツが透けないようにする */
-}
-
-/* 影や境界線（任意） */
-header.global-nav,
-nav.global-nav,
-nav.site-nav,
-#siteNav {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  background: #fff;
   box-shadow: 0 2px 6px rgba(0,0,0,.06);
   border-bottom: 1px solid #eee;
 }
 
 /* ================================
-   サークル一覧 表表示 用のスタイル（テスト用に固定幅指定）
+   サークル一覧 表表示 用（スクロールしやすさ調整）
    ================================ */
-#circleList {
-  max-width: 1360px;
-  margin-left: auto;
-  margin-right: auto;
-  padding-left: 12px;
-  padding-right: 12px;
-}
-
-#circleList table {
-  width: auto;               /* 固定幅にするため auto */
-  table-layout: fixed;       /* 固定レイアウト */
-  border-collapse: collapse;
-}
-
-#circleList th,
-#circleList td {
-  border: 1px solid #ccc;
-  padding: 6px 10px;
-  text-align: left;
-  word-wrap: break-word;
-}
-
-/* ★ テスト用: 各列をすべて200pxに固定 */
-#circleList th:nth-child(1), #circleList td:nth-child(1) { width: 200px; }
-#circleList th:nth-child(2), #circleList td:nth-child(2) { width: 200px; }
-#circleList th:nth-child(3), #circleList td:nth-child(3) { width: 200px; }
-#circleList th:nth-child(4), #circleList td:nth-child(4) { width: 200px; }
-
+#circleList { max-width: 1360px; margin-left: auto; margin-right: auto; padding-left: 12px; padding-right: 12px; }
+#circleList table { width: auto; table-layout: fixed; border-collapse: collapse; }
+#circleList th, #circleList td { border: 1px solid #ccc; padding: 6px 10px; text-align: left; word-wrap: break-word; }
+/* 任意の固定幅の例（JS側で<colgroup>指定するので最小限に留める） */
 #circleList thead th { background: #f8fafc; font-weight: 600; }
-#circleList tr:last-child th,
-#circleList tr:last-child td { border-bottom: none; }
 
-.ui-pill--active,
-.ui-pill[aria-selected="true"],
-.ui-pill[aria-pressed="true"] {
-background: var(--brand);
-border-color: var(--brand);
-color: var(--brand-ink);
-font-weight: 700; /* 太字で強調 */
-box-shadow: 0 0 0 2px rgba(78,124,255,.35); /* 強めのリング */
+/* ================================
+   ナビ風Pillボタン（共通化）
+   ================================ */
+.ui-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: .25rem;
+  padding: .375rem .75rem;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--fg);
+  border-radius: 9999px;             /* カプセル */
+  box-shadow: var(--shadow-sm);
+  font: 600 14px/1.1 system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans JP", sans-serif;
+  letter-spacing: .01em;
+  cursor: pointer;
+  user-select: none;
+  transition: background .15s ease, color .15s ease, border-color .15s ease, transform .06s ease;
 }
+.ui-pill:hover { background: #f3f4f6; }
+.ui-pill:active { transform: translateY(1px); }
+.ui-pill:focus-visible { outline: none; box-shadow: var(--shadow-sm), 0 0 0 3px rgba(31,111,235,.28); }
 
-.ui-pill { font-weight: 700; }
+/* 現在選択中（濃く） */
 .ui-pill--active,
 .ui-pill[aria-selected="true"],
 .ui-pill[aria-pressed="true"] {
-/* ナビと同トーン + 強めのアウトラインで“いま選択中”を明確化 */
-background: var(--brand);
-border-color: var(--brand);
-color: var(--brand-ink);
-box-shadow: 0 0 0 2px rgba(78,124,255,.38), var(--shadow-sm);
+  background: var(--brand);
+  border-color: var(--brand);
+  color: var(--brand-ink);
+  font-weight: 700; /* 太字で強調 */
+  box-shadow: 0 0 0 2px rgba(31,111,235,.38), var(--shadow-sm);
 }
 @media (prefers-color-scheme: dark) {
-.ui-pill--active,
-.ui-pill[aria-selected="true"],
-.ui-pill[aria-pressed="true"] {
-box-shadow: 0 0 0 2px rgba(78,124,255,.55), var(--shadow-sm);
+  .ui-pill--active,
+  .ui-pill[aria-selected="true"],
+  .ui-pill[aria-pressed="true"] {
+    box-shadow: 0 0 0 2px rgba(31,111,235,.55), var(--shadow-sm);
+  }
 }
+.hidden { display: none !important; }  /* モード未選択の行を確実に隠す */
+
+/* =====================================================
+   追記: 新サブボタン(#subControls) & 初期非表示/演出
+   -----------------------------------------------------
+   - JS側で class 付与がなくても見た目が整うように、
+     #subControls button を .ui-pill と同等の見た目に統一
+   - アクティブ状態は .is-active / aria-selected / aria-pressed をサポート
+   - #viewControls というID運用に合わせてレイアウトを追加
+   - 初期非表示の保険: .is-hidden を付けたら非表示にできるユーティリティ
+   - フェードイン演出用の .fade-in を追加
+   ===================================================== */
+#viewControls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem;
+  align-items: center;
+  margin-bottom: var(--space-3);
 }
+
+/* 新サブボタンの横並び＆スクロール耐性 */
+#subControls {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: .5rem;
+  overflow-x: auto;
+  padding: .5rem 0;
+}
+
+/* 新サブボタンの見た目（.ui-pill と同等のトーン）*/
+#subControls button {
+  display: inline-flex;
+  align-items: center;
+  gap: .25rem;
+  padding: .375rem .75rem;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--fg);
+  border-radius: 9999px;
+  box-shadow: var(--shadow-sm);
+  font: 600 14px/1.1 system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans JP", sans-serif;
+  letter-spacing: .01em;
+  cursor: pointer;
+  user-select: none;
+  transition: background .15s ease, color .15s ease, border-color .15s ease, transform .06s ease;
+}
+#subControls button:hover { background: #f3f4f6; }
+#subControls button:active { transform: translateY(1px); }
+#subControls button:focus-visible {
+  outline: none;
+  box-shadow: var(--shadow-sm), 0 0 0 3px rgba(31,111,235,.28);
+}
+
+/* アクティブ強調（どの指定でも反応するよう多重対応） */
+#subControls button.is-active,
+#subControls button[aria-selected="true"],
+#subControls button[aria-pressed="true"],
+#subControls .ui-pill--active {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: var(--brand-ink);
+  font-weight: 700;
+  box-shadow: 0 0 0 2px rgba(31,111,235,.38), var(--shadow-sm);
+}
+@media (prefers-color-scheme: dark) {
+  #subControls button.is-active,
+  #subControls button[aria-selected="true"],
+  #subControls button[aria-pressed="true"],
+  #subControls .ui-pill--active {
+    box-shadow: 0 0 0 2px rgba(31,111,235,.55), var(--shadow-sm);
+  }
+}
+
+/* 初期非表示の保険（JSから .is-hidden を付ければ確実に隠せる） */
+#viewControls.is-hidden,
+.sub-switch.is-hidden,
+#subControls.is-hidden {
+  display: none !important;
+}
+
+/* フェードイン演出（必要に応じて要素に .fade-in を付与） */
+@keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
+.fade-in { animation: fadeIn .18s ease-out; }
