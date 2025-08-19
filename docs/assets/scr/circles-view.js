@@ -207,8 +207,14 @@ function setSubControls(html, onClick, datasetKey = "data-scope", mode = window.
     const target = ev.target.closest(".js-sub-btn");
     if (!target) return;
     const key = target.getAttribute("data-scope") || target.getAttribute("data-filter");
+    // 先にUIを更新（class/aria）。再描画でinnerHTML置換されても初期状態が正しくなるようにする。
+    sub.querySelectorAll(".js-sub-btn").forEach(btn => {
+      const active = (btn === target);
+      btn.classList.toggle("ui-pill--active", active);
+      btn.setAttribute("aria-selected", active ? "true" : "false");
+      btn.setAttribute("aria-pressed", active ? "true" : "false");
+    });
     onClick?.(key);
-    sub.querySelectorAll(".js-sub-btn").forEach(btn => btn.classList.toggle("ui-pill--active", btn === target));
   };
 }
 
@@ -252,10 +258,20 @@ function setSubControls(html, onClick, datasetKey = "data-scope", mode = window.
       toggleLoadMore(firstData.length > 20);
     }
 
-    // active 初期付与
-    const sub = ensureSubControls(window.__currentView);
-    const initBtn = sub.querySelector(`[data-scope="${initialKey}"]`);
-    if (initBtn) initBtn.classList.add("ui-pill--active");
+    // active 初期付与（classとariaを同期）
+    {
+      const sub = ensureSubControls(window.__currentView);
+      const initBtn = sub.querySelector(`[data-scope="${initialKey}"]`);
+      if (sub) {
+        sub.querySelectorAll(".js-sub-btn").forEach(btn => {
+          const active = (initBtn && btn === initBtn);
+          btn.classList.toggle("ui-pill--active", !!active);
+          btn.setAttribute("aria-selected", active ? "true" : "false");
+          btn.setAttribute("aria-pressed", active ? "true" : "false");
+        });
+      }
+    }
+
 
     function buildKanaViewData(sortedAll, key) {
       const isCorp  = (d) => getCatLower(d) === "企業";
@@ -334,9 +350,19 @@ function setSubControls(html, onClick, datasetKey = "data-scope", mode = window.
       window.renderCards(first);
       toggleLoadMore(first.length > 20);
     }
-    const sub = ensureSubControls(window.__currentView);
-    const initBtn = sub.querySelector(`[data-scope="${initialKey}"]`);
-    if (initBtn) initBtn.classList.add("ui-pill--active");
+    // active 初期付与（classとariaを同期）
+    {
+      const sub = ensureSubControls(window.__currentView);
+      const initBtn = sub.querySelector(`[data-scope="${initialKey}"]`);
+      if (sub) {
+        sub.querySelectorAll(".js-sub-btn").forEach(btn => {
+          const active = (initBtn && btn === initBtn);
+          btn.classList.toggle("ui-pill--active", !!active);
+          btn.setAttribute("aria-selected", active ? "true" : "false");
+          btn.setAttribute("aria-pressed", active ? "true" : "false");
+        });
+      }
+    }
 
     document.getElementById('circleList')?.classList.add('circle-list');
   }
@@ -363,11 +389,18 @@ function setSubControls(html, onClick, datasetKey = "data-scope", mode = window.
       "data-scope",
       "table"
     );
-    // 表表示でも初期選択のボタンを強調（.ui-pill--active）
+    // 表表示でも初期選択のボタンを強調（.ui-pill--active + aria）
     {
       const sub = ensureSubControls(window.__currentView);
       const initBtn = sub?.querySelector(`[data-scope="${initialKey}"]`);
-      if (initBtn) initBtn.classList.add("ui-pill--active");
+      if (sub) {
+        sub.querySelectorAll(".js-sub-btn").forEach(btn => {
+          const active = (initBtn && btn === initBtn);
+          btn.classList.toggle("ui-pill--active", !!active);
+          btn.setAttribute("aria-selected", active ? "true" : "false");
+          btn.setAttribute("aria-pressed", active ? "true" : "false");
+        });
+      }
     }
 
     // スペース順で安定ソート
