@@ -388,3 +388,33 @@ nav.site-nav,
   outline: none;
   box-shadow: var(--shadow-sm), 0 0 0 3px rgba(31,111,235,.28);
 }
+
+/* ナビの想定高さ（必要なら値を調整） */
+:root { --nav-h: 56px; }
+
+
+/* 本文が固定ナビに隠れないよう上に余白を確保 */
+body { padding-top: var(--nav-h); }
+
+
+/* ナビを常時固定表示に（前の .navbar の sticky 指定を上書き） */
+.navbar {
+position: fixed !important;
+top: 0;
+z-index: 1000; /* セクションやフライヤーより前面に */
+/* 背景と境界は既存のまま（site.css 内の色に準拠） */
+background: #f8fafc;
+border-bottom: 1px solid var(--border);
+}
+
+
+/* アンカー遷移時に見出しがヘッダーに隠れないよう調整 */
+/* h2 だけでなく、セクションIDへのジャンプにも効かせる */
+section, section > h2, [id] { scroll-margin-top: var(--nav-h); }
+
+
+/* 印刷時は固定を解除（既存の @media print と整合） */
+@media print {
+.navbar { position: static !important; }
+body { padding-top: 0; }
+}
