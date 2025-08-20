@@ -1,46 +1,36 @@
-// circles-view.js（修正版・安定版）
-// 目的：
-//  - デフォルト表示を「CSVのspace列の有無」で切替（spaceあり→サークル順A／全空→五十音あ）
-//  - スペース順ボタンが反応しない不具合を解消（renderSpaceViewを追加／初期化を一本化）
-//  - 表表示は<colgroup>＋style直指定で列幅を確実に制御し、微調整APIも提供
-//  - 50音「すべて」時は一般→企業→委託の順で結合
-//  - コメント多め。既存のrenderCards()はそのまま利用
-//  - 【今回の修正】初期ロード時に"別モードのサブ行（例：あ〜わ）"が見えてしまう競合を解消
-//      └ 2つ目のIIFEにある run() のモード決定を window.__currentView 優先に変更
-//      └ これにより、HTML側の aria-selected 初期値に影響されず、実際に描画したモードに同期する
+// circles-view.js（refactor: 可読性・保守性向上 / 挙動・表示は変更しない）
+// 役割：サークル一覧の 3 モード（50音 / スペース順 / 表）を描画し、
+//       上部タブ（.js-mode-btn）とサブボタン（.js-sub-btn）の状態同期を行う。
+// 方針：
+//  - 既存の公開API名（renderKanaView/renderSpaceView/renderPlainTable/initView）を維持
+//  - 既存のUI仕様（選択中を濃く、ARIA反映、CSV space有 → デフォルトSpace(A)）を維持
+//  - コードを機能別ブロックに整理、重複ユーティリティを統合
+//  - コメントを追加（日本語）
 
 (() => {
   "use strict";
 
   /* =========================
-   * グローバル設定（表の列幅 微調整用）
+   * 表カラム幅 設定（表モードだけ使用）
    * ========================= */
   const defaultTableConfig = {
-    // 列幅（px）：[スペース, サークル名, PN, 区分]
-    widths: [160, 200, 200, 150],
-    // true: 総幅＝列幅合計で固定
-    forceTotalWidthBySum: true,
-    // 数値指定で総幅を明示固定したい場合（nullなら列幅合計）
-    explicitTotalWidth: null,
-    // #circleList の最大幅（px）。nullでCSS任せ
-    containerMaxWidth: 1360
+    widths: [160, 200, 200, 150],    // [スペース, サークル名, PN, 区分]
+    forceTotalWidthBySum: true,       // true: 合計をそのまま総幅に採用
+    explicitTotalWidth: null,         // 数値指定で総幅固定（nullなら合計）
+    containerMaxWidth: 1360           // #circleList の最大幅（px）
   };
-  // ウィンドウからも編集できる可変設定
+  // ウィンドウから編集可能（開発支援）。既に存在すれば上書きしない
   window.circleTableConfig = window.circleTableConfig || { ...defaultTableConfig };
 
-  // デベロッパ向け簡易API（コンソールから即反映）
+  // デベロッパ向けの即時反映API（任意）
   window.setTableWidths = (arr) => {
-    if (Array.isArray(arr) && arr.length === 4 && arr.every(n => Number.isFinite(n))) {
-      window.circleTableConfig.widths = arr.map(n => Math.max(40, Math.floor(n))); // 最小40px保護
+    if (Array.isArray(arr) && arr.length === 4 && arr.every(Number.isFinite)) {
+      window.circleTableConfig.widths = arr.map(n => Math.max(40, Math.floor(n))); // 最小40px
       if (window.__currentView === "table") renderPlainTable(window.__currentFilterKey || "all");
     }
   };
   window.setTableTotalWidth = (pxOrNull) => {
-    if (pxOrNull == null) {
-      window.circleTableConfig.explicitTotalWidth = null;
-    } else if (Number.isFinite(pxOrNull)) {
-      window.circleTableConfig.explicitTotalWidth = Math.max(160, Math.floor(pxOrNull)); // 最小160px保護
-    }
+    window.circleTableConfig.explicitTotalWidth = (pxOrNull == null) ? null : Math.max(160, Math.floor(pxOrNull));
     if (window.__currentView === "table") renderPlainTable(window.__currentFilterKey || "all");
   };
   window.resetTableConfig = () => {
@@ -51,55 +41,37 @@
   /* =========================
    * ユーティリティ
    * ========================= */
-
-  /** id 取得のヘルパ */
   const $ = (id) => document.getElementById(id);
-
-  /** データ取得（未ロード時は空配列） */
   const getData = () => Array.isArray(window.circleData) ? window.circleData : [];
 
-// ▼共通：モードに応じてサブ行の表示/非表示を切替
-function showRowFor(mode) {
-  const rows = {
-    space: document.getElementById('sub-switch-space'),
-    kana:  document.getElementById('sub-switch-kana'),
-    table: document.getElementById('sub-switch-table'),
-  };
-  Object.entries(rows).forEach(([k, el]) => {
-    if (!el) return;
-    el.classList.toggle('hidden', k !== mode);
-  });
-}
-  /** circleData の到着を待つ（最大 5 秒） */
+  /** 指定モード以外のサブ行を隠し、対象のみ表示 */
+  function showRowFor(mode) {
+    const rows = { space: $("sub-switch-space"), kana: $("sub-switch-kana"), table: $("sub-switch-table") };
+    Object.entries(rows).forEach(([k, el]) => el?.classList.toggle("hidden", k !== mode));
+  }
+
+  /** circleData の到着を待つ（最大 timeoutMs ms） */
   function waitForData(timeoutMs = 5000) {
     if (getData().length > 0) return Promise.resolve(getData());
     return new Promise((resolve) => {
       const start = Date.now();
       const timer = setInterval(() => {
-        if (getData().length > 0 || Date.now() - start > timeoutMs) {
-          clearInterval(timer);
-          resolve(getData());
-        }
+        if (getData().length > 0 || Date.now() - start > timeoutMs) { clearInterval(timer); resolve(getData()); }
       }, 100);
     });
   }
 
-  /** 「さらに読み込む」ボタン表示切替（カード表示用） */
+  /** カード表示時の「さらに読み込む」可視切替 */
   function toggleLoadMore(show) {
-    const btn = document.getElementById("loadMoreCircles");
+    const btn = $("loadMoreCircles");
     if (btn) btn.style.display = show ? "block" : "none";
   }
 
-  /** サブボタンコンテナを #viewControls の直下に配置（無ければ近傍に作成） */
-function ensureSubControls(mode = window.__currentView) {
-  // 既存のサブ行（.sub-switch）へ出力：space/kana/table
-  const map = {
-    space: $("sub-switch-space"),
-    kana:  $("sub-switch-kana"),
-    table: $("sub-switch-table"),
-  };
-  return map[mode] || map.space || (function () {
-    // 最終フォールバック（存在しない場合だけ一時的に作る）
+  /** サブボタンの設置先（.sub-switch）を返す。無ければフォールバック生成 */
+  function ensureSubControls(mode = window.__currentView) {
+    const map = { space: $("sub-switch-space"), kana: $("sub-switch-kana"), table: $("sub-switch-table") };
+    if (map[mode]) return map[mode];
+    // 最終フォールバック（テンプレ依存を避けるため一時生成）
     let sub = $("subControls");
     if (!sub) {
       sub = document.createElement("div");
@@ -108,27 +80,21 @@ function ensureSubControls(mode = window.__currentView) {
       (list?.parentNode || document.body).insertBefore(sub, list || null);
     }
     return sub;
-  })();
-}
+  }
 
-  /* =========================
-   * 比較関数（window公開）
-   * ========================= */
-
-  /** 50音（kana優先）での比較 */
+  /* ===== 比較関数（公開） ===== */
   function compareKana(a, b) {
     const collator = new Intl.Collator("ja", { usage: "sort", sensitivity: "base", ignorePunctuation: true });
     const ka = (a?.kana ?? a?.name ?? "").toString();
     const kb = (b?.kana ?? b?.name ?? "").toString();
     return collator.compare(ka, kb);
   }
-  window.compareKana = compareKana;
+  window.compareKana = window.compareKana || compareKana;
 
-  /** スペース：Aブロック→数値（先頭の数値のみ） */
   function compareSpaceStr(a, b) {
-    const regex = /^([A-Z]+)-?(\d+)/i;
+    const re = /^([A-Z]+)-?(\d+)/i;
     const sa = String(a || ""), sb = String(b || "");
-    const ma = sa.match(regex), mb = sb.match(regex);
+    const ma = sa.match(re), mb = sb.match(re);
     if (ma && mb) {
       const ba = ma[1].toUpperCase(), bb = mb[1].toUpperCase();
       if (ba !== bb) return ba.localeCompare(bb, "ja");
@@ -138,106 +104,69 @@ function ensureSubControls(mode = window.__currentView) {
   }
   window.compareSpaceStr = window.compareSpaceStr || compareSpaceStr;
 
-  /* =========================
-   * かな行判定（ローマ字 a/k/s/... にも対応）
-   * ========================= */
-
-  /** レコード → 行キー（"あ/か/さ/た/な/は/ま/や/ら/わ"） */
+  /* ===== かな行判定 ===== */
   function rowKeyForRecord(rec) {
     const kanaRaw = (rec?.kana ?? "").toString().trim().toLowerCase();
-    // ローマ字1文字 → 行キー
-    const romanMap = { a: "あ", k: "か", s: "さ", t: "た", n: "な", h: "は", m: "ま", y: "や", r: "ら", w: "わ" };
-    if (romanMap[kanaRaw]) return romanMap[kanaRaw];
-
-    // 日本語先頭文字からの判定（ひらがな正規化）
+    const roman = { a:"あ",k:"か",s:"さ",t:"た",n:"な",h:"は",m:"ま",y:"や",r:"ら",w:"わ" };
+    if (roman[kanaRaw]) return roman[kanaRaw];
     const ch = normalizeKanaHead((rec?.kana || rec?.name || "").toString());
-    const ROWS = {
-      "あ": ["あ","い","う","え","お"],
-      "か": ["か","き","く","け","こ"],
-      "さ": ["さ","し","す","せ","そ"],
-      "た": ["た","ち","つ","て","と"],
-      "な": ["な","に","ぬ","ね","の"],
-      "は": ["は","ひ","ふ","へ","ほ"],
-      "ま": ["ま","み","む","め","も"],
-      "や": ["や","ゆ","よ"],
-      "ら": ["ら","り","る","れ","ろ"],
-      "わ": ["わ","を","ん"]
-    };
-    for (const [row, chars] of Object.entries(ROWS)) {
-      if (chars.includes(ch)) return row;
-    }
+    const ROWS = { "あ":["あ","い","う","え","お"], "か":["か","き","く","け","こ"], "さ":["さ","し","す","せ","そ"], "た":["た","ち","つ","て","と"], "な":["な","に","ぬ","ね","の"], "は":["は","ひ","ふ","へ","ほ"], "ま":["ま","み","む","め","も"], "や":["や","ゆ","よ"], "ら":["ら","り","る","れ","ろ"], "わ":["わ","を","ん"] };
+    for (const [row, chars] of Object.entries(ROWS)) if (chars.includes(ch)) return row;
     return "";
   }
-
-  /** 先頭1文字を “基底ひらがな” に正規化（濁点/半濁点/小書き/カタカナ対応） */
   function normalizeKanaHead(str) {
     if (!str) return "";
-    let s = String(str).trim();
-    if (!s) return "";
-    let ch = s.charAt(0).normalize("NFKC").normalize("NFKD").replace(/\p{M}+/gu, "");
+    let ch = String(str).trim().charAt(0).normalize("NFKC").normalize("NFKD").replace(/\p{M}+/gu, "");
     const code = ch.charCodeAt(0);
-    // カタカナ→ひらがな
-    if (code >= 0x30A1 && code <= 0x30FA) ch = String.fromCharCode(code - 0x60);
+    if (code >= 0x30A1 && code <= 0x30FA) ch = String.fromCharCode(code - 0x60); // カタカナ→ひらがな
     const SMALL = { "ぁ":"あ","ぃ":"い","ぅ":"う","ぇ":"え","ぉ":"お","っ":"つ","ゃ":"や","ゅ":"ゆ","ょ":"よ","ゎ":"わ" };
     return SMALL[ch] || ch;
   }
+  const getCatLower = (d) => String(d?.cat ?? d?.type ?? "").trim().toLowerCase();
 
-  /** cat/type を小文字で取得 */
-  function getCatLower(d) {
-    const cat = d?.cat ?? d?.type ?? "";
-    return String(cat).trim().toLowerCase();
-  }
+  /* ===== サブボタン描画・挙動（共通） ===== */
+  function setSubControls(html, onClick, datasetKey = "data-scope", mode = window.__currentView) {
+    const sub = ensureSubControls(mode);
+    // どのテンプレでも動くよう強制的にクラスを付与、data-filter 互換も確保
+    sub.innerHTML = html
+      .replaceAll("<button ", `<button class="ui-pill js-sub-btn" `)
+      .replaceAll('data-filter="', 'data-scope="');
 
-  /* =========================
-   * サブボタン生成（共通ヘルパ）
-   * ========================= */
-
-function setSubControls(html, onClick, datasetKey = "data-scope", mode = window.__currentView) {
-  const sub = ensureSubControls(mode);
-  // 互換のため：どのテンプレでも .ui-pill / .js-sub-btn を強制付与し、data-filter も併記
-  sub.innerHTML = html
-    .replaceAll("<button ", `<button class="ui-pill js-sub-btn" `)
-    .replaceAll('data-filter="', 'data-scope="')             // 旧 attr → 新 attr へ
-    .replaceAll('data-scope="',  'data-scope="');            // 再置換安全弁
-  // data-filter 互換（ハンドラ側で参照するため両方持たせる）
-  sub.querySelectorAll("[data-scope]").forEach(b => {
-    if (!b.hasAttribute("data-filter")) b.setAttribute("data-filter", b.getAttribute("data-scope"));
-  });
-  sub.onclick = (ev) => {
-    const target = ev.target.closest(".js-sub-btn");
-    if (!target) return;
-    const key = target.getAttribute("data-scope") || target.getAttribute("data-filter");
-    // 先にUIを更新（class/aria）。再描画でinnerHTML置換されても初期状態が正しくなるようにする。
-    sub.querySelectorAll(".js-sub-btn").forEach(btn => {
-      const active = (btn === target);
-      btn.classList.toggle("ui-pill--active", active);
-      btn.setAttribute("aria-selected", active ? "true" : "false");
-      btn.setAttribute("aria-pressed", active ? "true" : "false");
+    sub.querySelectorAll("[data-scope]").forEach(b => {
+      if (!b.hasAttribute("data-filter")) b.setAttribute("data-filter", b.getAttribute("data-scope"));
     });
-    onClick?.(key);
-  };
-}
+
+    sub.onclick = (ev) => {
+      const target = ev.target.closest(".js-sub-btn");
+      if (!target) return;
+      const key = target.getAttribute("data-scope") || target.getAttribute("data-filter");
+      // UI（見た目/ARIA）の先行反映：再描画で置換されても初期状態が正しくなる
+      sub.querySelectorAll(".js-sub-btn").forEach(btn => {
+        const active = (btn === target);
+        btn.classList.toggle("ui-pill--active", active);
+        btn.setAttribute("aria-selected", active ? "true" : "false");
+        btn.setAttribute("aria-pressed",  active ? "true" : "false");
+      });
+      onClick?.(key);
+    };
+  }
 
   /* =========================
    * 各表示モード
    * ========================= */
-
-  // 50音表示（カード）
-  // 「すべて」時：一般（企業/委託以外）を あ→…→わ で結合し、その後ろに 企業→委託 をまとめる
   function renderKanaView(initialKey = "あ") {
     window.__currentView = "kana";
     window.__currentFilterKey = initialKey;
-    showRowFor("kana"); // ←追記：50音のサブ行を表示、他は隠す
+    showRowFor("kana");
 
     const baseAll = [...getData()].sort(compareKana);
     const rows = ["あ","か","さ","た","な","は","ま","や","ら","わ"];
 
     setSubControls(
       `<div role="group" aria-label="50音行フィルタ">
-      <button type="button" data-scope="all">すべて</button>
-      ${rows.map(r => `<button type="button" data-scope="${r}">${r}</button>`).join("")}
-      <button type="button" data-scope="corp">企業</button>
-
+        <button type="button" data-scope="all">すべて</button>
+        ${rows.map(r => `<button type="button" data-scope="${r}">${r}</button>`).join("")}
+        <button type="button" data-scope="corp">企業</button>
       </div>`,
       (key) => {
         window.__currentFilterKey = key;
@@ -246,8 +175,6 @@ function setSubControls(html, onClick, datasetKey = "data-scope", mode = window.
           window.renderCards(viewData);
           toggleLoadMore(viewData.length > 20);
         }
-        "data-scope",
-        "kana"
       }
     );
 
@@ -258,20 +185,8 @@ function setSubControls(html, onClick, datasetKey = "data-scope", mode = window.
       toggleLoadMore(firstData.length > 20);
     }
 
-    // active 初期付与（classとariaを同期）
-    {
-      const sub = ensureSubControls(window.__currentView);
-      const initBtn = sub.querySelector(`[data-scope="${initialKey}"]`);
-      if (sub) {
-        sub.querySelectorAll(".js-sub-btn").forEach(btn => {
-          const active = (initBtn && btn === initBtn);
-          btn.classList.toggle("ui-pill--active", !!active);
-          btn.setAttribute("aria-selected", active ? "true" : "false");
-          btn.setAttribute("aria-pressed", active ? "true" : "false");
-        });
-      }
-    }
-
+    // 初期アクティブ強調
+    applyInitialActive(initialKey);
 
     function buildKanaViewData(sortedAll, key) {
       const isCorp  = (d) => getCatLower(d) === "企業";
@@ -280,36 +195,32 @@ function setSubControls(html, onClick, datasetKey = "data-scope", mode = window.
       if (key === "corp") return sortedAll.filter(isCorp);
       if (key === "all") {
         const general = sortedAll.filter(d => !isCorp(d) && !isItaku(d));
-        let mergedGeneral = [];
-        rows.forEach(r => {
-          mergedGeneral = mergedGeneral.concat(general.filter(d => rowKeyForRecord(d) === r));
-        });
+        let merged = [];
+        rows.forEach(r => { merged = merged.concat(general.filter(d => rowKeyForRecord(d) === r)); });
         const corp  = sortedAll.filter(isCorp);
         const itaku = sortedAll.filter(isItaku);
-        return mergedGeneral.concat(corp, itaku);
+        return merged.concat(corp, itaku);
       }
       return sortedAll.filter(d => rowKeyForRecord(d) === key);
     }
-    document.getElementById('circleList')?.classList.add('circle-list');
+    $("circleList")?.classList.add("circle-list");
   }
 
-  // スペース順表示（カード）★不足していたため追加
   function renderSpaceView(initialKey = "A") {
     window.__currentView = "space";
     window.__currentFilterKey = initialKey;
-    showRowFor("space"); // ←追記
+    showRowFor("space");
 
     const base = [...getData()].sort((a, b) => compareSpaceStr(a.space || "", b.space || ""));
     const letters = ["A","B","C","D","E"];
 
     setSubControls(
       `<div role="group" aria-label="スペース行フィルタ">
-      <button type="button" data-scope="all">すべて</button>
-      ${letters.map(L => `<button type="button" data-scope="${L}">${L}</button>`).join("")}
-      <button type="button" data-scope="corp">企業</button>
-      <button type="button" data-scope="itaku">委託</button>
-    </div>`,
-
+        <button type="button" data-scope="all">すべて</button>
+        ${letters.map(L => `<button type="button" data-scope="${L}">${L}</button>`).join("")}
+        <button type="button" data-scope="corp">企業</button>
+        <button type="button" data-scope="itaku">委託</button>
+      </div>`,
       (key) => {
         window.__currentFilterKey = key;
         let data = base;
@@ -319,9 +230,7 @@ function setSubControls(html, onClick, datasetKey = "data-scope", mode = window.
         } else if (key === "itaku") {
           const hasCat = data.some(d => (d.cat ?? d.type ?? "").trim() !== "");
           data = hasCat ? data.filter(d => getCatLower(d) === "委託") : [];
-        } else if (key === "all") {
-          // 全件
-        } else {
+        } else if (key !== "all") {
           const re = new RegExp(`^${key}`, "i");
           data = data.filter(d => re.test(String(d.space || "")));
         }
@@ -329,8 +238,6 @@ function setSubControls(html, onClick, datasetKey = "data-scope", mode = window.
           window.renderCards(data);
           toggleLoadMore(data.length > 20);
         }
-        "data-scope",
-        "space"
       }
     );
 
@@ -350,30 +257,18 @@ function setSubControls(html, onClick, datasetKey = "data-scope", mode = window.
       window.renderCards(first);
       toggleLoadMore(first.length > 20);
     }
-    // active 初期付与（classとariaを同期）
-    {
-      const sub = ensureSubControls(window.__currentView);
-      const initBtn = sub.querySelector(`[data-scope="${initialKey}"]`);
-      if (sub) {
-        sub.querySelectorAll(".js-sub-btn").forEach(btn => {
-          const active = (initBtn && btn === initBtn);
-          btn.classList.toggle("ui-pill--active", !!active);
-          btn.setAttribute("aria-selected", active ? "true" : "false");
-          btn.setAttribute("aria-pressed", active ? "true" : "false");
-        });
-      }
-    }
 
-    document.getElementById('circleList')?.classList.add('circle-list');
+    // 初期アクティブ強調
+    applyInitialActive(initialKey);
+
+    $("circleList")?.classList.add("circle-list");
   }
 
-  // 表表示（プレーンテーブル）
   function renderPlainTable(initialKey = "all") {
     window.__currentView = "table";
     window.__currentFilterKey = initialKey;
-    showRowFor("table"); // ←追記
+    showRowFor("table");
 
-    // サブボタン（フィルタ兼用）
     setSubControls(
       `<div role="group" aria-label="表表示フィルタ">
         <button type="button" data-scope="all">すべて</button>
@@ -389,19 +284,9 @@ function setSubControls(html, onClick, datasetKey = "data-scope", mode = window.
       "data-scope",
       "table"
     );
-    // 表表示でも初期選択のボタンを強調（.ui-pill--active + aria）
-    {
-      const sub = ensureSubControls(window.__currentView);
-      const initBtn = sub?.querySelector(`[data-scope="${initialKey}"]`);
-      if (sub) {
-        sub.querySelectorAll(".js-sub-btn").forEach(btn => {
-          const active = (initBtn && btn === initBtn);
-          btn.classList.toggle("ui-pill--active", !!active);
-          btn.setAttribute("aria-selected", active ? "true" : "false");
-          btn.setAttribute("aria-pressed", active ? "true" : "false");
-        });
-      }
-    }
+
+    // 初期アクティブ強調
+    applyInitialActive(initialKey);
 
     // スペース順で安定ソート
     const base = [...getData()].sort((a, b) => compareSpaceStr(a.space || "", b.space || ""));
@@ -417,11 +302,11 @@ function setSubControls(html, onClick, datasetKey = "data-scope", mode = window.
     } else if (["A","B","C","D","E"].includes(initialKey)) {
       const re = new RegExp(`^${initialKey}`, "i");
       data = base.filter(d => re.test(String(d.space || "")));
-    } // "all" の場合は base のまま
+    }
 
-    // テーブル描画
-    const container = document.getElementById('circleList');
-    container?.classList.remove('circle-list');
+    // テーブル描画（style直指定で列幅を固定）
+    const container = $("circleList");
+    container?.classList.remove("circle-list");
     if (!container) return;
     container.innerHTML = "";
     container.style.overflowX = "auto";
@@ -435,11 +320,9 @@ function setSubControls(html, onClick, datasetKey = "data-scope", mode = window.
     }
 
     const cfg = window.circleTableConfig;
-    const COLS = (cfg?.widths && cfg.widths.length === 4) ? cfg.widths : defaultTableConfig.widths;
+    const COLS = (cfg?.widths?.length === 4) ? cfg.widths : defaultTableConfig.widths;
     const sum = COLS.reduce((a,b)=>a+b, 0);
-    const totalWidth = (cfg.explicitTotalWidth != null)
-      ? cfg.explicitTotalWidth
-      : (cfg.forceTotalWidthBySum ? sum : sum);
+    const totalWidth = (cfg.explicitTotalWidth != null) ? cfg.explicitTotalWidth : (cfg.forceTotalWidthBySum ? sum : sum);
 
     const table = document.createElement("table");
     table.style.tableLayout = "fixed";
@@ -461,7 +344,7 @@ function setSubControls(html, onClick, datasetKey = "data-scope", mode = window.
 
     const thead = document.createElement("thead");
     const trh = document.createElement("tr");
-    ["スペース", "サークル名", "PN", "区分"].forEach((txt, i) => {
+    ["スペース","サークル名","PN","区分"].forEach((txt, i) => {
       const th = document.createElement("th");
       th.textContent = txt;
       th.style.width = `${COLS[i]}px`;
@@ -481,13 +364,7 @@ function setSubControls(html, onClick, datasetKey = "data-scope", mode = window.
     const tbody = document.createElement("tbody");
     data.forEach((d) => {
       const tr = document.createElement("tr");
-      const cells = [
-        String(d?.space || ""),
-        String(d?.name || ""),
-        String(d?.pn || ""),
-        String(d?.cat || d?.type || "")
-      ];
-      cells.forEach((val, i) => {
+      [String(d?.space||""), String(d?.name||""), String(d?.pn||""), String(d?.cat||d?.type||"")].forEach((val, i) => {
         const td = document.createElement("td");
         td.textContent = val;
         td.style.width = `${COLS[i]}px`;
@@ -508,83 +385,76 @@ function setSubControls(html, onClick, datasetKey = "data-scope", mode = window.
     toggleLoadMore(false);
 
     console.log(`[renderPlainTable] key=${initialKey}, colWidths=${COLS.join(",")}, total=${totalWidth}px`);
-    
-    document.getElementById('circleList')?.classList.add('circle-list');
+
+    $("circleList")?.classList.add("circle-list"); // 既存互換のため維持
   }
-  window.renderPlainTable = renderPlainTable;
+  window.renderPlainTable = window.renderPlainTable || renderPlainTable;
 
   /* =========================
    * 初期化（一本化）
    * ========================= */
-
-  /** デフォルト表示：space有→サークル順A／全空→五十音あ */
   function initView() {
-    // 旧サブ行が残っていた場合に備えて排除（従来処理の干渉を防止）
+    // 旧サブ行が残っていた場合に備えて排除
     document.querySelectorAll('.sub-switch, #sub-switch-space, #sub-switch-kana, #sub-switch-table').forEach(el => el.remove?.());
     try {
       const data = getData();
       const hasSpace = Array.isArray(data) && data.some(d => (d?.space ?? "").toString().trim() !== "");
-      if (hasSpace) {
-        renderSpaceView("A");
-        console.log("[init] default = Space(A)");
-      } else {
-        renderKanaView("あ");
-        console.log("[init] default = Kana(あ)");
-      }
+      if (hasSpace) { renderSpaceView("A"); console.log("[init] default = Space(A)"); }
+      else { renderKanaView("あ"); console.log("[init] default = Kana(あ)"); }
     } catch (e) {
       console.error("[initView] error:", e);
       renderKanaView("あ"); // フォールバック
     }
-    document.getElementById("viewControls")?.classList.remove("is-hidden");
-    document.getElementById("subControls")?.classList.remove("is-hidden");
-
+    $("viewControls")?.classList.remove("is-hidden");
+    $("subControls")?.classList.remove("is-hidden");
   }
 
-  // DOMContentLoadedハンドラは一つに集約（※重複定義による競合を避ける）
   document.addEventListener("DOMContentLoaded", async () => {
     try {
-      await waitForData();   // データ到着待ち
-      initView();            // デフォルト描画
+      await waitForData();    // データ到着待ち
+      initView();             // デフォルト描画
 
-      // 上部タブのバインド（重複バインド回避のため addEventListener 一回）
-      const btnKana  = $("sortKana");
-      const btnSpace = $("sortSpace");
-      const btnTable = $("viewTable");
-      if (btnKana)  btnKana.addEventListener("click", () => renderKanaView("あ"));
-      if (btnSpace) btnSpace.addEventListener("click", () => renderSpaceView("A"));
-      if (btnTable) btnTable.addEventListener("click", () => renderPlainTable("all"));
+      // 上部タブのバインド（一度だけ）
+      $("sortKana")?.addEventListener("click", () => renderKanaView("あ"));
+      $("sortSpace")?.addEventListener("click", () => renderSpaceView("A"));
+      $("viewTable")?.addEventListener("click", () => renderPlainTable("all"));
     } catch (e) {
       console.error("[DOMContentLoaded] init failed:", e);
       renderKanaView("あ");
     }
   });
 
-  //!-- =========================================================
-  // ここから下は「UI強調の最小追加（既存ソースに追記）」
-  //   - 上部のモードボタン（.js-mode-btn）とサブボタン（.js-sub-btn）に
-  //     .ui-pill--active / ARIA を同期させる軽量ハンドラ
-  //   - 既存の filterCircles / switchViewMode があればそれを尊重
-  //========================================================= -->
-  /**
-   * クリックされたボタンをアクティブ強調（.ui-pill--active 付与）
-   * @param {HTMLElement} btn
-   * @param {string|HTMLElement} groupSelector - 親コンテナ or セレクタ
-   */
+  /* =========================
+   * UI強調の最小追加（既存互換）
+   * ========================= */
+  /** 指定グループでアクティブを1つにする */
   const setActive = (btn, groupSelector = ".mode-switch") => {
     const group = btn.closest(groupSelector) || document;
     group.querySelectorAll('.ui-pill').forEach(el => {
       el.classList.remove('ui-pill--active');
       if (el.hasAttribute('aria-selected')) el.setAttribute('aria-selected', 'false');
-      if (el.hasAttribute('aria-pressed')) el.setAttribute('aria-pressed', 'false');
+      if (el.hasAttribute('aria-pressed'))  el.setAttribute('aria-pressed',  'false');
     });
     btn.classList.add('ui-pill--active');
     if (btn.hasAttribute('aria-selected')) btn.setAttribute('aria-selected', 'true');
-    if (btn.hasAttribute('aria-pressed')) btn.setAttribute('aria-pressed', 'true');
+    if (btn.hasAttribute('aria-pressed'))  btn.setAttribute('aria-pressed',  'true');
   };
 
+  /** 初期アクティブ（sub-controls）の同期 */
+  function applyInitialActive(initialKey) {
+    const sub = ensureSubControls(window.__currentView);
+    const initBtn = sub?.querySelector(`[data-scope="${initialKey}"]`);
+    if (!sub) return;
+    sub.querySelectorAll(".js-sub-btn").forEach(btn => {
+      const active = (initBtn && btn === initBtn);
+      btn.classList.toggle("ui-pill--active", !!active);
+      btn.setAttribute("aria-selected", active ? "true" : "false");
+      btn.setAttribute("aria-pressed",  active ? "true" : "false");
+    });
+  }
+
   // モードボタン（サークル順・50音順・表表示）
-  const modeButtons = document.querySelectorAll('.js-mode-btn');
-  modeButtons.forEach(btn => {
+  document.querySelectorAll('.js-mode-btn').forEach(btn => {
     btn.addEventListener('click', (e) => {
       const target = e.currentTarget;
       const mode = target.dataset.mode;
@@ -596,8 +466,7 @@ function setSubControls(html, onClick, datasetKey = "data-scope", mode = window.
   });
 
   // サブボタン（A~E・企業・委託・あ~わ など）
-  const subButtons = document.querySelectorAll('.js-sub-btn');
-  subButtons.forEach(btn => {
+  document.querySelectorAll('.js-sub-btn').forEach(btn => {
     btn.addEventListener('click', (e) => {
       const target = e.currentTarget;
       setActive(target, '.sub-switch');
@@ -608,91 +477,57 @@ function setSubControls(html, onClick, datasetKey = "data-scope", mode = window.
     });
   });
 
-  // 初期強調の同期（HTML上で aria-selected="true" 等があれば反映）
+  // 初期強調の同期（HTML上で aria-selected などがあれば反映）
   const syncInitialActive = (containerSel) => {
     document.querySelectorAll(containerSel).forEach(container => {
       const selected = container.querySelector('.ui-pill[aria-selected="true"], .ui-pill[aria-pressed="true"], .ui-pill.ui-pill--active');
       if (selected) setActive(selected, containerSel);
     });
   };
-
-  // 初期同期を実行
   syncInitialActive('.mode-switch');
   syncInitialActive('.sub-switch');
 
-  // グローバル公開（inline onclick対策）
+  // 公開（inline onclick対策、既にあれば保持）
   window.renderKanaView   = window.renderKanaView   || renderKanaView;
   window.renderSpaceView  = window.renderSpaceView  || renderSpaceView;
   window.renderPlainTable = window.renderPlainTable || renderPlainTable;
   window.initView         = window.initView         || initView;
-
 })();
 
-
-// --- 追加: 旧スタイルボタンの除去・重複「すべて」排除 -------------------------
-// 目的: スクリーンショットのように「未選択の行まで出る」「一番下に旧ボタンが残る」を解消
-// 方針: 既存DOMから旧クラスや特徴を持つ要素を除去/非表示にする（最小変更）
+// --- 追加: レガシーUIの掃除とサブ行のモード同期 -------------------------------
 (() => {
   "use strict";
-  /** 旧スタイルのサブ行を片付ける（安全に remove） */
   function cleanupLegacyUI() {
-    // 想定される旧クラス/容器を列挙（なければ無視される）
-    const selectors = [
-      '.alpha-switch',          // A~E等 旧行
-      '.kana-switch',           // あ~わ 等 旧行
-      '.sub-switch-legacy',     // 名前違いの旧行
-      '#legacySubControls',     // 旧ID想定
-      '#oldSubControls',        // 旧ID想定
-    ];
+    const selectors = ['.alpha-switch', '.kana-switch', '.sub-switch-legacy', '#legacySubControls', '#oldSubControls'];
     document.querySelectorAll(selectors.join(',')).forEach(el => el.remove());
 
-    // 下部に残るプレーンな旧ボタン行（<button>が並ぶだけで .ui-pill でも .sub-switch でもない）
-    // 「A B C D E 企業 委託 すべて」といった並びを検出して削除
-    const circlesSection = document.getElementById('circles') || document;
-    const rows = [...circlesSection.querySelectorAll('div,nav,section')];
-    rows.forEach(row => {
-      // すでに新UIの行ならスキップ
+    // プレーンな旧ボタン行（A B C D E 企業 委託 すべて …）をパターン検出で削除
+    const root = document.getElementById('circles') || document;
+    [...root.querySelectorAll('div,nav,section')].forEach(row => {
       if (row.classList.contains('sub-switch') || row.classList.contains('mode-switch')) return;
       const btns = row.querySelectorAll('button');
       if (!btns.length) return;
       const texts = [...btns].map(b => b.textContent.trim());
-      const looksLikeAlpha = ['A','B','C','D','E'].every(t => texts.includes(t));
-      const looksLikeKana = ['あ','か','さ','た','な','は','ま','や','ら','わ'].some(t => texts.includes(t));
-      const hasCorpOrItaku = texts.includes('企業') || texts.includes('委託');
-      const hasSubete = texts.includes('すべて');
-      if ((looksLikeAlpha || looksLikeKana) && hasSubete) {
-        row.remove();
-      }
+      const looksAlpha = ['A','B','C','D','E'].every(t => texts.includes(t));
+      const looksKana  = ['あ','か','さ','た','な','は','ま','や','ら','わ'].some(t => texts.includes(t));
+      const hasSubete  = texts.includes('すべて');
+      if ((looksAlpha || looksKana) && hasSubete) row.remove();
     });
   }
 
-  // モードに応じたサブ行のみ表示（他は非表示）
   function showOnlyCurrentSubRow(mode) {
-    const rows = {
-      space: document.getElementById('sub-switch-space'),
-      kana:  document.getElementById('sub-switch-kana'),
-      table: document.getElementById('sub-switch-table')
-    };
-    Object.entries(rows).forEach(([k, el]) => {
-      if (!el) return;
-      el.classList.toggle('hidden', k !== mode);
-    });
+    const rows = { space: document.getElementById('sub-switch-space'), kana: document.getElementById('sub-switch-kana'), table: document.getElementById('sub-switch-table') };
+    Object.entries(rows).forEach(([k, el]) => el?.classList.toggle('hidden', k !== mode));
   }
 
-  // 初期化タイミングで実行
   const run = () => {
     cleanupLegacyUI();
-    // 【修正点】HTMLの aria-selected ではなく、実際に描画が決まる window.__currentView を最優先
-    // これにより、初期ロード直後に "サークル順" を描画したのに "50音" のサブ行が見えてしまう競合を防止
+    // HTMLの aria-selected よりも、実際に描画したモード（window.__currentView）を優先
     const current = document.querySelector('.js-mode-btn[aria-selected="true"]');
     const mode = window.__currentView || current?.dataset.mode || 'space';
-
     showOnlyCurrentSubRow(mode);
   };
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', run);
-  } else {
-    run();
-  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', run);
+  else run();
 })();

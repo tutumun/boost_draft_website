@@ -1,15 +1,27 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!--
+    ブースト！公式サイト index.html（リファクタ版）
+    - 目的: 構造の明確化・可読性向上。挙動と表示は変更しない。
+    - 備考: circles-cards.js / circles-view.js のAPI（グローバル関数・ID）を維持。
+  -->
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ブースト！公式サイト</title>
-  <link rel="stylesheet" href="assets/scr/site.css">
+
+  <!-- スタイル -->
+  <link rel="stylesheet" href="assets/scr/site.css" />
+
+  <!-- サークル一覧の描画/制御（deferでDOM後に実行） -->
   <script src="assets/scr/circles-cards.js" defer></script>
   <script src="assets/scr/circles-view.js" defer></script>
 </head>
 <body>
-  <nav class="navbar">
+  <!-- ========================
+      固定ナビ（アンカー内リンク）
+      ======================== -->
+  <nav class="navbar" role="navigation" aria-label="ページ内ナビゲーション">
     <ul>
       <li><a href="#hero">開催概要</a></li>
       <li><a href="#news">最新情報</a></li>
@@ -24,20 +36,25 @@
     </ul>
   </nav>
 
+  <!-- ========================
+      ヒーロー（開催概要）
+      - フライヤー画像は下のIIFEでDOM完成後に注入
+      ======================== -->
   <section id="hero" class="hero">
     <h1>ブースト！同人イベント</h1>
     <p>2025/10/12 10:00〜16:00 @ 東京ビッグサイト</p>
     <p>一般参加：1,000円 ／ サークル参加：5,000円</p>
-    <div class="cta">
+    <div class="cta" role="group" aria-label="主要導線">
       <a href="#general" class="btn">一般参加ガイド</a>
       <a href="#circle" class="btn">サークル参加ガイド</a>
-      <!-- 追加: サークル参加ガイド詳細リンク -->
+      <!-- 追加: サークル参加ガイド詳細リンク（v0.22） -->
       <a href="circle.html" class="btn btn-highlight">サークル参加ガイド詳細</a>
     </div>
   </section>
 
-  <section id="news">
-    <h2>最新情報</h2>
+  <!-- ======================== 最新情報 ======================== -->
+  <section id="news" aria-labelledby="news-heading">
+    <h2 id="news-heading">最新情報</h2>
     <ul>
       <li>2025/08/10 開催概要ページを更新しました</li>
       <li>2025/08/01 サークル参加申込を開始しました</li>
@@ -45,8 +62,9 @@
     </ul>
   </section>
 
-  <section id="schedule">
-    <h2>当日スケジュール</h2>
+  <!-- ======================== 当日スケジュール ======================== -->
+  <section id="schedule" aria-labelledby="schedule-heading">
+    <h2 id="schedule-heading">当日スケジュール</h2>
     <table>
       <tr><th>時間</th><th>内容</th></tr>
       <tr><td>09:00</td><td>サークル入場開始</td></tr>
@@ -57,8 +75,9 @@
     </table>
   </section>
 
-  <section id="general">
-    <h2>一般参加ガイド</h2>
+  <!-- ======================== 一般参加ガイド ======================== -->
+  <section id="general" aria-labelledby="general-heading">
+    <h2 id="general-heading">一般参加ガイド</h2>
     <ul>
       <li>年齢確認：18歳未満入場不可</li>
       <li>入場：パンフレット購入で入場可（1,000円）</li>
@@ -68,8 +87,9 @@
     </ul>
   </section>
 
-  <section id="circle">
-    <h2>サークル参加ガイド</h2>
+  <!-- ======================== サークル参加ガイド ======================== -->
+  <section id="circle" aria-labelledby="circle-heading">
+    <h2 id="circle-heading">サークル参加ガイド</h2>
     <ul>
       <li>参加資格：同人誌・創作物の頒布が可能な個人/団体</li>
       <li>ブース種別：1ブース 5,000円</li>
@@ -77,12 +97,15 @@
       <li>見本誌：本部へ提出必須</li>
       <li>景品イラスト：任意提出可</li>
     </ul>
-    <!-- 追加: 詳細ページへの目立つリンク -->
+    <!-- 追加: 詳細ページへの目立つリンク（v0.22） -->
     <p><a href="circle.html" class="btn btn-highlight">▶ サークル参加ガイド詳細ページはこちら</a></p>
   </section>
 
-  <section id="circles" class="section">
-    <h2>サークル一覧</h2>
+  <!-- ======================== サークル一覧（コントロール＋コンテナ） ======================== -->
+  <section id="circles" class="section" aria-labelledby="circles-heading">
+    <h2 id="circles-heading">サークル一覧</h2>
+
+    <!-- 表示モード切替（タブ風）: circles-view.js が参照 -->
     <div id="viewControls" class="is-hidden">
       <div class="mode-switch" role="tablist" aria-label="表示モード切替">
         <button class="ui-pill js-mode-btn" data-mode="space" aria-selected="true" role="tab" id="tab-space">サークル順</button>
@@ -90,22 +113,29 @@
         <button class="ui-pill js-mode-btn" data-mode="table" aria-selected="false" role="tab" id="tab-table">表表示</button>
       </div>
     </div>
+
+    <!-- サブコントロール（JSが動的に中身を差し替え） -->
     <div id="subControls" class="is-hidden" aria-label="範囲切替"></div>
+
+    <!-- 一覧描画先（カード or テーブル） -->
     <div id="circleList"></div>
   </section>
 
-  <section id="map">
-    <h2>配置図（要約）</h2>
+  <!-- ======================== 配置図（要約） ======================== -->
+  <section id="map" aria-labelledby="map-heading">
+    <h2 id="map-heading">配置図（要約）</h2>
     <p>受付は正面入口、年齢確認は左ホール、抽選会場は右ホール。島配置は一方通行。非常口は2ヶ所、喫煙所は屋外指定場所。再入場はリストバンド必須。</p>
   </section>
 
-  <section id="access">
-    <h2>アクセス</h2>
+  <!-- ======================== アクセス ======================== -->
+  <section id="access" aria-labelledby="access-heading">
+    <h2 id="access-heading">アクセス</h2>
     <p>りんかい線 国際展示場駅から徒歩5分、ゆりかもめ 東京ビッグサイト駅から徒歩2分。駐車場は利用不可。</p>
   </section>
 
-  <section id="qa">
-    <h2>Q&A</h2>
+  <!-- ======================== Q&A ======================== -->
+  <section id="qa" aria-labelledby="qa-heading">
+    <h2 id="qa-heading">Q&A</h2>
     <dl>
       <dt>Q. 入場に必要なものは？</dt>
       <dd>A. パンフレットと年齢確認用の身分証明書です。</dd>
@@ -116,101 +146,147 @@
     </dl>
   </section>
 
-  <section id="contact">
-    <h2>問い合わせ</h2>
+  <!-- ======================== 問い合わせ ======================== -->
+  <section id="contact" aria-labelledby="contact-heading">
+    <h2 id="contact-heading">問い合わせ</h2>
     <p>Webページの不具合や要望・お問い合わせは以下フォームよりお問い合わせください。</p>
     <a href="https://forms.gle/BiaA183SZK1LsPKH9" target="_blank" rel="noopener" class="btn">問い合わせフォーム</a>
     <p>上記フォームへのお問い合わせについては基本的には回答しておりません。回答が必要であれば、ブースト実行委員会のXからDMにてご連絡ください</p>
   </section>
 
+  <!-- ========================
+      ヒーローにフライヤー画像を注入（表示はそのまま）
+      ======================== -->
   <script>
-  (function () {
-    'use strict';
-    const FLYER_SRC = './assets/img/flyers/flyer-placeholder.png';
-    const FLYER_ALT = 'イベントフライヤー';
-    function injectStyle() {
-      const id = 'flyer-in-hero-style';
-      if (document.getElementById(id)) return;
-      const css = `
-        .hero-flex { display: flex; gap: 24px; }
-        .hero-left { flex: 0 0 auto; max-width: 360px; }
-        .hero-left .flyer-img { width: 100%; border-radius: 12px; box-shadow: 0 4px 16px rgba(0,0,0,.12); }
-        .btn-highlight { background: #f97316; color: #fff; font-weight: bold; }
-        @media (max-width: 880px) { .hero-flex { flex-direction: column; } .hero-left { max-width: none; } }
-      `;
-      const style = document.createElement('style');
-      style.id = id;
-      style.appendChild(document.createTextNode(css));
-      document.head.appendChild(style);
-    }
-    function getHeroRoot() { return document.querySelector('header.hero') || document.querySelector('.hero'); }
-    function createFlyerImg() { const img = document.createElement('img'); img.className = 'flyer-img'; img.src = FLYER_SRC; img.alt = FLYER_ALT; return img; }
-    function mountFlyer() { const hero = getHeroRoot(); if (!hero) return; if (hero.querySelector('.hero-flex')) return; const left = document.createElement('div'); left.className = 'hero-left'; left.appendChild(createFlyerImg()); const right = document.createElement('div'); right.className = 'hero-right'; const nodes = Array.from(hero.childNodes); nodes.forEach(n => right.appendChild(n)); const wrap = document.createElement('div'); wrap.className = 'hero-flex'; wrap.appendChild(left); wrap.appendChild(right); hero.appendChild(wrap); }
-    function onReady() { injectStyle(); mountFlyer(); }
-    if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', onReady); } else { onReady(); }
-  })();
+    (function () {
+      'use strict';
+      const FLYER_SRC = './assets/img/flyers/flyer-placeholder.png';
+      const FLYER_ALT = 'イベントフライヤー';
+
+      // インラインCSSを注入（外部CSSに影響なし）
+      function injectStyle() {
+        const id = 'flyer-in-hero-style';
+        if (document.getElementById(id)) return;
+        const css = `
+          .hero-flex { display: flex; gap: 24px; }
+          .hero-left { flex: 0 0 auto; max-width: 360px; }
+          .hero-left .flyer-img { width: 100%; border-radius: 12px; box-shadow: 0 4px 16px rgba(0,0,0,.12); }
+          .btn-highlight { background: #f97316; color: #fff; font-weight: bold; }
+          @media (max-width: 880px) { .hero-flex { flex-direction: column; } .hero-left { max-width: none; } }
+        `;
+        const style = document.createElement('style');
+        style.id = id;
+        style.appendChild(document.createTextNode(css));
+        document.head.appendChild(style);
+      }
+
+      // ヒーローセクションのルート取得（section.hero / header.hero 互換）
+      function getHeroRoot() {
+        return document.querySelector('header.hero') || document.querySelector('.hero');
+      }
+
+      // 画像生成
+      function createFlyerImg() {
+        const img = document.createElement('img');
+        img.className = 'flyer-img';
+        img.src = FLYER_SRC;
+        img.alt = FLYER_ALT;
+        return img;
+      }
+
+      // 2カラム化して左に画像を挿入（初回のみ）
+      function mountFlyer() {
+        const hero = getHeroRoot();
+        if (!hero) return;
+        if (hero.querySelector('.hero-flex')) return; // 二重適用を防止
+
+        const left = document.createElement('div');
+        left.className = 'hero-left';
+        left.appendChild(createFlyerImg());
+
+        const right = document.createElement('div');
+        right.className = 'hero-right';
+        const nodes = Array.from(hero.childNodes);
+        nodes.forEach(n => right.appendChild(n));
+
+        const wrap = document.createElement('div');
+        wrap.className = 'hero-flex';
+        wrap.appendChild(left);
+        wrap.appendChild(right);
+        hero.appendChild(wrap);
+      }
+
+      function onReady() { injectStyle(); mountFlyer(); }
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', onReady);
+      } else {
+        onReady();
+      }
+    })();
   </script>
   <!-- index.html 末尾（</body>直前）に追記してください -->
 
-<!-- ▼ モードの見た目更新API（復活） -->
-<script>
-(() => {
-  "use strict";
-  /*
-   * setModeActive(mode)
-   * - 表示モード切替ボタン（.js-mode-btn）の見た目と状態を同期します。
-   * - .ui-pill--active クラス、および aria-selected / aria-pressed を適切に更新します。
-   * - circles-view.js 側で描画が完了した後に呼び出すことを想定しています。
-   */
-  window.setModeActive = (mode) => {
-    // 対象ボタンを data-mode 属性で取得
-    const target = document.querySelector(`.js-mode-btn[data-mode="${mode}"]`);
-    if (!target) return; // 見つからない場合は何もしない（安全側）
+  <!-- ▼ モードの見た目更新API（復活）
+      役割: circles-view.js の描画完了後に、上部タブの選択状態をUIへ反映する軽量関数。
+      影響範囲: 見た目のみ。挙動は circles-view.js に委譲。 -->
+  <script>
+    (() => {
+      'use strict';
+      /*
+       * setModeActive(mode)
+       * - 表示モード切替ボタン（.js-mode-btn）の見た目と状態を同期します。
+       * - .ui-pill--active クラス、および aria-selected / aria-pressed を適切に更新します。
+       * - circles-view.js 側で描画が完了した後に呼び出すことを想定しています。
+       */
+      window.setModeActive = (mode) => {
+        // 対象ボタンを data-mode 属性で取得
+        const target = document.querySelector(`.js-mode-btn[data-mode="${mode}"]`);
+        if (!target) return; // 見つからない場合は何もしない（安全側）
 
-    // 同一グループ（.mode-switch 内）のボタン群を取得
-    const group = target.closest('.mode-switch') || document;
+        // 同一グループ（.mode-switch 内）のボタン群を取得
+        const group = target.closest('.mode-switch') || document;
 
-    // いったん全ボタンを非アクティブ化
-    group.querySelectorAll('.ui-pill').forEach((el) => {
-      el.classList.remove('ui-pill--active');
-      if (el.hasAttribute('aria-selected')) el.setAttribute('aria-selected', 'false');
-      if (el.hasAttribute('aria-pressed'))  el.setAttribute('aria-pressed',  'false');
-    });
+        // いったん全ボタンを非アクティブ化
+        group.querySelectorAll('.ui-pill').forEach((el) => {
+          el.classList.remove('ui-pill--active');
+          if (el.hasAttribute('aria-selected')) el.setAttribute('aria-selected', 'false');
+          if (el.hasAttribute('aria-pressed'))  el.setAttribute('aria-pressed',  'false');
+        });
 
-    // 対象ボタンをアクティブ化
-    target.classList.add('ui-pill--active');
-    if (target.hasAttribute('aria-selected')) target.setAttribute('aria-selected', 'true');
-    if (target.hasAttribute('aria-pressed'))  target.setAttribute('aria-pressed',  'true');
-  };
-})();
-</script>
+        // 対象ボタンをアクティブ化
+        target.classList.add('ui-pill--active');
+        if (target.hasAttribute('aria-selected')) target.setAttribute('aria-selected', 'true');
+        if (target.hasAttribute('aria-pressed'))  target.setAttribute('aria-pressed',  'true');
+      };
+    })();
+  </script>
 
-<!-- ▼ モード切替の実処理（復活） -->
-<script>
-/*
- * switchViewMode(mode)
- * - 選択されたモードに応じて描画関数を呼び分けます。
- * - 例：space -> renderSpaceView('A'), kana -> renderKanaView('あ'), table -> renderPlainTable('all')
- * - 描画後に setModeActive(mode) を呼んで、ボタンUIの状態も同期させてください。
- */
-window.switchViewMode = function(mode) {
-  try {
-    if (mode === 'space') {
-      // サークル順：A から表示
-      renderSpaceView('A');
-    } else if (mode === 'kana') {
-      // 50音：あ行から表示
-      renderKanaView('あ');
-    } else if (mode === 'table') {
-      // 表：全件表示
-      renderPlainTable('all');
-    }
-  } catch (e) {
-    // 例外は握りつぶさず、開発時に気付きやすいようにログ出力
-    console.error('[switchViewMode] failed:', e);
-  }
-};
-</script>
-
+  <!-- ▼ モード切替の実処理（復活）
+      役割: タブクリック→各描画関数に委譲。描画後のUI同期は setModeActive を利用。 -->
+  <script>
+    /*
+     * switchViewMode(mode)
+     * - 選択されたモードに応じて描画関数を呼び分けます。
+     * - 例：space -> renderSpaceView('A'), kana -> renderKanaView('あ'), table -> renderPlainTable('all')
+     * - 描画後に setModeActive(mode) を呼んで、ボタンUIの状態も同期させてください。
+     */
+    window.switchViewMode = function (mode) {
+      try {
+        if (mode === 'space') {
+          // サークル順：A から表示
+          renderSpaceView('A');
+        } else if (mode === 'kana') {
+          // 50音：あ行から表示
+          renderKanaView('あ');
+        } else if (mode === 'table') {
+          // 表：全件表示
+          renderPlainTable('all');
+        }
+      } catch (e) {
+        // 例外は握りつぶさず、開発時に気付きやすいようにログ出力
+        console.error('[switchViewMode] failed:', e);
+      }
+    };
+  </script>
 </body>
 </html>

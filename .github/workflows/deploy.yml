@@ -1,28 +1,25 @@
-# GitHub Pages: docs/ を自動デプロイ
-# ------------------------------------------------------------
-# 使い方：
-# 1) リポジトリの Settings > Pages で「Source: GitHub Actions」を選択
-# 2) main ブランチに push すると、docs/ の中身が自動公開されます
-# 3) Actions タブで進捗を確認できます（初回は Enable Actions が必要な場合あり）
+# GitHub Pages: docs/ を自動デプロイ（Refactoring ブランチ用）
+# - 失敗の主因になりやすい permissions / concurrency / trigger を明示
+# - 表示/生成処理は不要（docs/ をそのまま配信）
 
 name: Deploy Pages
 
 on:
   push:
     branches:
-      - main            # ← デプロイ対象ブランチ（必要に応じて変更）
+      - Refactoring          # ← デプロイ対象ブランチ（大小文字を実ブランチ名と一致させる）
     paths:
-      - "docs/**"       # docs/ 配下に変更があるときのみ実行
-      - ".github/workflows/deploy.yml"
-  workflow_dispatch:     # 手動実行も可能にする
+      - "docs/**"           # docs/ 配下の変更で実行
+      - ".github/workflows/deploy.yml"  # ワークフロー変更時も実行
+  workflow_dispatch: {}
 
-# Pages デプロイに必要な権限
+# ★ GitHub Pages デプロイには以下の permission が必須
 permissions:
   contents: read
-  pages: write           # ← 必須
-  id-token: write        # ← 必須（deploy-pages がOIDCで使用）
+  pages: write
+  id-token: write
 
-# 同時実行を制御（途中のジョブがあればキャンセルして最新だけをデプロイ）
+# ★ 並列実行での衝突を防止（推奨）
 concurrency:
   group: "pages"
   cancel-in-progress: true
@@ -46,7 +43,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: docs    # ← 公開したいディレクトリ
+          path: docs   # ← 公開したいディレクトリ（docs/index.html が存在すること）
 
       # アップロードしたアーティファクトを Pages にデプロイ
       - name: Deploy to GitHub Pages
