@@ -1,34 +1,38 @@
 /* =========================================
-   ブースト！公式サイト 共通スタイル（v0.21 修正統合版）
-   - 追加点: --brand / --brand-ink / --shadow-sm を:rootに定義
-             ナビ風ボタン共通クラス .ui-pill のベース＆アクティブを追加
-             モード切替コンテナ .mode-switch / .sub-switch を整列
-   - 既存の見た目は維持しつつ、サークル表示タブの強調が確実に効くように調整
+  ブースト！公式サイト 共通スタイル（v0.21 → refactor-keep-visual）
+  目的: 可読性・保守性の向上（見た目と動作は変更しない）
+  - セクション順の整理 / 記法の統一 / 重複の明確化（統合は外観維持のため最小限）
+  - 変数（CSSカスタムプロパティ）の説明追記
    ========================================= */
 
 /* ---------- CSS変数（配色・余白・幅） ---------- */
 :root {
+  /* 色 */
   --bg: #ffffff;                 /* 背景色 */
   --fg: #222222;                 /* 文字色 */
   --muted: #666666;              /* 補助テキスト色 */
-  --primary: #1f6feb;            /* 既存のアクセント色 */
+  --primary: #1f6feb;            /* 既存アクセント色 */
   --primary-fg: #ffffff;         /* アクセント上の文字色 */
   --border: #e5e7eb;             /* 罫線色 */
   --card: #ffffff;               /* カード背景 */
+
+  /* 影・角丸・幅 */
   --shadow: 0 2px 10px rgba(0,0,0,.06); /* カード影 */
+  --shadow-sm: 0 1px 2px rgba(0,0,0,.06); /* 小さめの影（pill等） */
   --radius: 10px;                /* 角丸 */
-  --maxw: 960px;                 /* 本文の最大幅 */
-  --space-1: .25rem;             /* 余白スケール */
+  --maxw: 960px;                 /* 本文最大幅 */
+
+  /* 余白スケール */
+  --space-1: .25rem;
   --space-2: .5rem;
   --space-3: .75rem;
   --space-4: 1rem;
   --space-5: 1.5rem;
   --space-6: 2rem;
 
-  /* ▼ 追加（pillボタン強調用トークン） */
-  --brand: var(--primary);       /* pillの塗りつぶし色 = 既存primaryを流用 */
-  --brand-ink: #ffffff;          /* pill上の文字色 */
-  --shadow-sm: 0 1px 2px rgba(0,0,0,.06);
+  /* Pillボタン強調（仕様 v0.22 で使用） */
+  --brand: var(--primary);       /* Pill塗りつぶし色 */
+  --brand-ink: #ffffff;          /* Pill上の文字色 */
 }
 
 /* ---------- ベースリセット（軽め） ---------- */
@@ -42,27 +46,52 @@ body {
   line-height: 1.7;
 }
 img { max-width: 100%; height: auto; vertical-align: middle; }
- a { color: var(--primary); text-decoration: none; }
+a { color: var(--primary); text-decoration: none; }
 a:hover { text-decoration: underline; }
 
 /* 共通レイアウト：ページ要素の幅制限 */
 nav.navbar,
 section,
-header.hero { width: min(100%, var(--maxw)); margin-inline: auto; padding-inline: var(--space-4); }
+header.hero {
+  width: min(100%, var(--maxw));
+  margin-inline: auto;
+  padding-inline: var(--space-4);
+}
 
 /* ---------- ナビゲーション ---------- */
-.navbar { position: sticky; top: 0; z-index: 20; background: #f8fafc; border-bottom: 1px solid var(--border); }
-.navbar ul { margin: 0; padding: var(--space-2) var(--space-4); display: flex; flex-wrap: wrap; gap: var(--space-2); list-style: none; }
-.navbar a { display: inline-block; padding: .4rem .6rem; border: 1px solid var(--border); border-radius: 8px; color: var(--fg); background: #fff; text-decoration: none; font-size: .95rem; }
+.navbar {
+  position: sticky; top: 0; z-index: 20;
+  background: #f8fafc;
+  border-bottom: 1px solid var(--border);
+}
+.navbar ul {
+  margin: 0; padding: var(--space-2) var(--space-4);
+  display: flex; flex-wrap: wrap; gap: var(--space-2);
+  list-style: none;
+}
+.navbar a {
+  display: inline-block;
+  padding: .4rem .6rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--fg);
+  background: #fff;
+  text-decoration: none;
+  font-size: .95rem;
+}
 .navbar a:hover { background: #f3f4f6; }
 
 /* ---------- ヒーロー（開催概要） ---------- */
 .hero { padding-block: var(--space-6); }
-.hero h1 { margin: 0 0 var(--space-2); font-size: clamp(1.6rem, 2.5vw + 1rem, 2.2rem); line-height: 1.25; }
+.hero h1 {
+  margin: 0 0 var(--space-2);
+  font-size: clamp(1.6rem, 2.5vw + 1rem, 2.2rem);
+  line-height: 1.25;
+}
 .hero p { margin: 0 0 var(--space-2); color: var(--muted); }
 .cta { margin-top: var(--space-3); display: flex; gap: var(--space-2); flex-wrap: wrap; }
 
-/* ---------- ボタン（.btn） ---------- */
+/* ---------- ボタン（.btn / 補助ボタン群） ---------- */
 .btn,
 .view-controls button,
 .more-row button {
@@ -82,40 +111,61 @@ header.hero { width: min(100%, var(--maxw)); margin-inline: auto; padding-inline
 .btn.primary:hover { filter: brightness(0.95); }
 
 /* ---------- セクション見出し ---------- */
-section > h2 { margin: var(--space-6) 0 var(--space-3); font-size: 1.35rem; border-left: 4px solid var(--primary); padding-left: .6rem; line-height: 1.2; }
+section > h2 {
+  margin: var(--space-6) 0 var(--space-3);
+  font-size: 1.35rem;
+  border-left: 4px solid var(--primary);
+  padding-left: .6rem;
+  line-height: 1.2;
+}
 
 /* ---------- 一覧・箇条書き ---------- */
 section ul { padding-left: 1.2rem; }
 section ul li { margin: .35rem 0; }
 
-/* ---------- 表（スケジュールなど） ---------- */
-section table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); }
-section table th, section table td { border-bottom: 1px solid var(--border); padding: .6rem .75rem; text-align: left; }
+/* ---------- 表（スケジュール等：一般） ---------- */
+section table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+section table th,
+section table td {
+  border-bottom: 1px solid var(--border);
+  padding: .6rem .75rem;
+  text-align: left;
+}
 section table thead th { background: #f8fafc; font-weight: 600; }
-section table tr:last-child th, section table tr:last-child td { border-bottom: none; }
+section table tr:last-child th,
+section table tr:last-child td { border-bottom: none; }
 
 /* ---------- サークル一覧：コントロール ---------- */
 .view-controls { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; margin-bottom: var(--space-3); }
 .view-controls span { color: var(--muted); }
 
-/* ▼ 追加：上部の表示モード切替/サブ切替の横並び＆スクロール耐性 */
+/* モード切替/サブ切替の横並び（スクロール耐性あり） */
 .mode-switch,
-.sub-switch { display:flex; flex-wrap:nowrap; gap:.5rem; overflow-x:auto; padding:.5rem 0; }
+.sub-switch {
+  display: flex; flex-wrap: nowrap; gap: .5rem;
+  overflow-x: auto; padding: .5rem 0;
+}
 
-/* ---------- サークル一覧：カードグリッド（新規に使わない場合は無害） ---------- */
+/* ---------- サークル一覧：カードグリッド ---------- */
 .circle-list { display: grid; gap: var(--space-3); grid-template-columns: repeat(1, minmax(0, 1fr)); }
 @media (min-width: 560px) { .circle-list { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (min-width: 880px) { .circle-list { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-.circle-list .card { /* 未使用でも既存互換のため残置 */
+.circle-list .card {
+  /* 未使用でも既存互換のため残置 */
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
-  display: grid;
-  grid-template-columns: 120px 1fr;
-  gap: var(--space-3);
-  padding: var(--space-3);
-  align-items: start;
+  display: grid; grid-template-columns: 120px 1fr; gap: var(--space-3);
+  padding: var(--space-3); align-items: start;
 }
 .circle-list .card img.cut { width: 100%; height: auto; border-radius: var(--radius); object-fit: cover; }
 .circle-list .card .info { display: flex; flex-direction: column; gap: .35rem; }
@@ -126,7 +176,15 @@ section table tr:last-child th, section table tr:last-child td { border-bottom: 
 .circle-list .card .info .sns a img { width: 20px; height: 20px; border-radius: 4px; display: block; }
 
 /* ---------- サークル一覧：表表示（renderPlainTable用） ---------- */
-#circleList table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); }
+#circleList table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
 #circleList thead th { background: #f8fafc; font-weight: 600; }
 #circleList th, #circleList td { border-bottom: 1px solid var(--border); padding: .6rem .75rem; text-align: left; }
 #circleList tr:last-child th, #circleList tr:last-child td { border-bottom: none; }
@@ -143,10 +201,10 @@ details[open] { background: #fcfdfd; }
 /* ---------- アクセシビリティ（フォーカス） ---------- */
 :focus-visible { outline: 3px solid rgba(31,111,235,.35); outline-offset: 2px; border-radius: 6px; }
 
-/* ---------- 余白の調整：セクション間 ---------- */
+/* ---------- セクション間余白 ---------- */
 section { margin-bottom: var(--space-6); }
 
-/* ---------- 印刷対応の簡易調整 ---------- */
+/* ---------- 印刷対応（簡易） ---------- */
 @media print {
   .navbar { position: static; }
   .view-controls, .cta, .more-row { display: none !important; }
@@ -155,18 +213,13 @@ section { margin-bottom: var(--space-6); }
 }
 
 /* ================================
-   サークルカード（circles-cards.js が生成する .circle-card 用）
+  サークルカード（circles-cards.js が生成）
    ================================ */
 .circle-card {
-  display: flex;
-  gap: 12px;
-  align-items: flex-start;
-  border: 1px solid #ccc;     /* 枠線 */
-  padding: 12px;              /* 内側余白 */
-  margin-bottom: 16px;        /* 下に余白 */
-  border-radius: 6px;         /* 角丸 */
-  background-color: #fff;     /* 背景色 */
-  box-shadow: 0 2px 4px rgba(0,0,0,0.05); /* ほんのり影 */
+  display: flex; gap: 12px; align-items: flex-start;
+  border: 1px solid #ccc; padding: 12px; margin-bottom: 16px;
+  border-radius: 6px; background-color: #fff;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
 }
 .circle-card .thumb img { display: block; max-width: 160px; height: auto; border-radius: 4px; }
 .circle-card .meta { flex: 1 1 auto; }
@@ -177,46 +230,40 @@ section { margin-bottom: var(--space-6); }
 .circle-card .sns img { width: 20px; height: 20px; display: block; }
 
 /* ================================
-   ナビゲーション固定（テーマ差異吸収用）
+  ナビゲーション固定（テーマ差異吸収用）
    ================================ */
 header.global-nav,
 nav.global-nav,
 nav.site-nav,
 #siteNav {
-  position: sticky;
-  top: 0;
-  z-index: 1000;
+  position: sticky; top: 0; z-index: 1000;
   background: #fff;
   box-shadow: 0 2px 6px rgba(0,0,0,.06);
   border-bottom: 1px solid #eee;
 }
 
 /* ================================
-   サークル一覧 表表示 用（スクロールしやすさ調整）
+  サークル一覧 表表示 用（スクロールしやすさ調整）
+  ※ 既存の見た目維持のため、#circleList 下の仕様はそのまま残置
    ================================ */
 #circleList { max-width: 1360px; margin-left: auto; margin-right: auto; padding-left: 12px; padding-right: 12px; }
 #circleList table { width: auto; table-layout: fixed; border-collapse: collapse; }
 #circleList th, #circleList td { border: 1px solid #ccc; padding: 6px 10px; text-align: left; word-wrap: break-word; }
-/* 任意の固定幅の例（JS側で<colgroup>指定するので最小限に留める） */
 #circleList thead th { background: #f8fafc; font-weight: 600; }
 
 /* ================================
-   ナビ風Pillボタン（共通化）
+  ナビ風Pillボタン（共通化）
    ================================ */
 .ui-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: .25rem;
+  display: inline-flex; align-items: center; gap: .25rem;
   padding: .375rem .75rem;
   border: 1px solid var(--border);
-  background: #fff;
-  color: var(--fg);
+  background: #fff; color: var(--fg);
   border-radius: 9999px;             /* カプセル */
   box-shadow: var(--shadow-sm);
   font: 600 14px/1.1 system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans JP", sans-serif;
   letter-spacing: .01em;
-  cursor: pointer;
-  user-select: none;
+  cursor: pointer; user-select: none;
   transition: background .15s ease, color .15s ease, border-color .15s ease, transform .06s ease;
 }
 .ui-pill:hover { background: #f3f4f6; }
@@ -240,60 +287,40 @@ nav.site-nav,
     box-shadow: 0 0 0 2px rgba(31,111,235,.55), var(--shadow-sm);
   }
 }
-.hidden { display: none !important; }  /* モード未選択の行を確実に隠す */
 
-/* =====================================================
-   追記: 新サブボタン(#subControls) & 初期非表示/演出
-   -----------------------------------------------------
-   - JS側で class 付与がなくても見た目が整うように、
-     #subControls button を .ui-pill と同等の見た目に統一
-   - アクティブ状態は .is-active / aria-selected / aria-pressed をサポート
-   - #viewControls というID運用に合わせてレイアウトを追加
-   - 初期非表示の保険: .is-hidden を付けたら非表示にできるユーティリティ
-   - フェードイン演出用の .fade-in を追加
-   ===================================================== */
+/* 汎用ユーティリティ */
+.hidden { display: none !important; }  /* JS側の保険：確実に隠す */
+
+/* ================================
+  追記: 新サブボタン(#subControls) & 初期非表示/演出
+  ※ 既存の見た目を変えないため、指定値は従来踏襲
+   ================================ */
 #viewControls {
-  display: flex;
-  flex-wrap: wrap;
-  gap: .5rem;
-  align-items: center;
+  display: flex; flex-wrap: wrap; gap: .5rem; align-items: center;
   margin-bottom: var(--space-3);
 }
 
 /* 新サブボタンの横並び＆スクロール耐性 */
 #subControls {
-  display: flex;
-  flex-wrap: nowrap;
-  gap: .5rem;
-  overflow-x: auto;
-  padding: .5rem 0;
+  display: flex; flex-wrap: nowrap; gap: .5rem; overflow-x: auto; padding: .5rem 0;
 }
 
-/* 新サブボタンの見た目（.ui-pill と同等のトーン）*/
+/* 新サブボタンの見た目（.ui-pill と同等のトーン） */
 #subControls button {
-  display: inline-flex;
-  align-items: center;
-  gap: .25rem;
+  display: inline-flex; align-items: center; gap: .25rem;
   padding: .375rem .75rem;
   border: 1px solid var(--border);
-  background: #fff;
-  color: var(--fg);
-  border-radius: 9999px;
-  box-shadow: var(--shadow-sm);
+  background: #fff; color: var(--fg);
+  border-radius: 9999px; box-shadow: var(--shadow-sm);
   font: 600 14px/1.1 system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans JP", sans-serif;
-  letter-spacing: .01em;
-  cursor: pointer;
-  user-select: none;
+  letter-spacing: .01em; cursor: pointer; user-select: none;
   transition: background .15s ease, color .15s ease, border-color .15s ease, transform .06s ease;
 }
 #subControls button:hover { background: #f3f4f6; }
 #subControls button:active { transform: translateY(1px); }
-#subControls button:focus-visible {
-  outline: none;
-  box-shadow: var(--shadow-sm), 0 0 0 3px rgba(31,111,235,.28);
-}
+#subControls button:focus-visible { outline: none; box-shadow: var(--shadow-sm), 0 0 0 3px rgba(31,111,235,.28); }
 
-/* アクティブ強調（どの指定でも反応するよう多重対応） */
+/* アクティブ強調（複数の指定方法をサポート） */
 #subControls button.is-active,
 #subControls button[aria-selected="true"],
 #subControls button[aria-pressed="true"],
@@ -313,13 +340,11 @@ nav.site-nav,
   }
 }
 
-/* 初期非表示の保険（JSから .is-hidden を付ければ確実に隠せる） */
+/* 初期非表示の保険 */
 #viewControls.is-hidden,
 .sub-switch.is-hidden,
-#subControls.is-hidden {
-  display: none !important;
-}
+#subControls.is-hidden { display: none !important; }
 
-/* フェードイン演出（必要に応じて要素に .fade-in を付与） */
+/* 簡易フェードイン演出 */
 @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
 .fade-in { animation: fadeIn .18s ease-out; }
