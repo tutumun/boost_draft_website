@@ -349,26 +349,42 @@ nav.site-nav,
 @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
 .fade-in { animation: fadeIn .18s ease-out; }
 
-/* さらに読み込むボタン */
-.load-more-btn {
-  display: inline-block;
-  margin: 1rem auto;
-  padding: 0.6rem 1.2rem;
-  font-size: 0.95rem;
-  font-weight: bold;
-  color: #fff;
-  background-color: #007bff; /* サイトのメインカラーに合わせる */
-  border: none;
-  border-radius: 6px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+/* 本体 */
+#loadMoreCircles {
+  /* 配置 */
+  display: block;                 /* 単独行にして中央寄せしやすく */
+  margin: 1rem auto;              /* 中央寄せ（左右auto） */
+  padding: 0.6rem 1.1rem;         /* 既存ボタンと同等の余白 */
+
+  /* 見た目（サイトの変数に合わせる） */
+  background: var(--primary);     /* 既存のブランド色 */
+  color: var(--primary-fg);       /* 文字は白 */
+  border: 1px solid var(--primary);
+  border-radius: 8px;             /* 角丸は他ボタンと統一 */
+  box-shadow: var(--shadow-sm);   /* 小さめの影（既存基準） */
+
+  /* タイポグラフィ */
+  font-size: .95rem;
+  font-weight: 700;               /* アクション強調 */
+  letter-spacing: .01em;
+
+  /* 操作感 */
   cursor: pointer;
-  transition: background-color 0.2s, transform 0.1s;
+  transition: filter .15s ease, transform .06s ease, box-shadow .15s ease;
 }
 
-.load-more-btn:hover {
-  background-color: #0056b3; /* hover時に濃く */
+/* ホバー時：少し濃く */
+#loadMoreCircles:hover {
+  filter: brightness(0.96);
 }
 
-.load-more-btn:active {
-  transform: scale(0.97); /* 押下感を出す */
+/* 押下時：わずかに沈み込む */
+#loadMoreCircles:active {
+  transform: translateY(1px);
+}
+
+/* フォーカス可視（アクセシビリティ） */
+#loadMoreCircles:focus-visible {
+  outline: none;
+  box-shadow: var(--shadow-sm), 0 0 0 3px rgba(31,111,235,.28);
 }
