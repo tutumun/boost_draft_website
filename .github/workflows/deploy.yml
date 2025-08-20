@@ -10,7 +10,7 @@ name: Deploy Pages
 on:
   push:
     branches:
-      - main            # ← デプロイ対象ブランチ（必要に応じて変更）
+      - Refactoring            # ← デプロイ対象ブランチ（必要に応じて変更）
     paths:
       - "docs/**"       # docs/ 配下に変更があるときのみ実行
       - ".github/workflows/deploy.yml"
