@@ -150,5 +150,67 @@
     if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', onReady); } else { onReady(); }
   })();
   </script>
+  <!-- index.html 末尾（</body>直前）に追記してください -->
+
+<!-- ▼ モードの見た目更新API（復活） -->
+<script>
+(() => {
+  "use strict";
+  /*
+   * setModeActive(mode)
+   * - 表示モード切替ボタン（.js-mode-btn）の見た目と状態を同期します。
+   * - .ui-pill--active クラス、および aria-selected / aria-pressed を適切に更新します。
+   * - circles-view.js 側で描画が完了した後に呼び出すことを想定しています。
+   */
+  window.setModeActive = (mode) => {
+    // 対象ボタンを data-mode 属性で取得
+    const target = document.querySelector(`.js-mode-btn[data-mode="${mode}"]`);
+    if (!target) return; // 見つからない場合は何もしない（安全側）
+
+    // 同一グループ（.mode-switch 内）のボタン群を取得
+    const group = target.closest('.mode-switch') || document;
+
+    // いったん全ボタンを非アクティブ化
+    group.querySelectorAll('.ui-pill').forEach((el) => {
+      el.classList.remove('ui-pill--active');
+      if (el.hasAttribute('aria-selected')) el.setAttribute('aria-selected', 'false');
+      if (el.hasAttribute('aria-pressed'))  el.setAttribute('aria-pressed',  'false');
+    });
+
+    // 対象ボタンをアクティブ化
+    target.classList.add('ui-pill--active');
+    if (target.hasAttribute('aria-selected')) target.setAttribute('aria-selected', 'true');
+    if (target.hasAttribute('aria-pressed'))  target.setAttribute('aria-pressed',  'true');
+  };
+})();
+</script>
+
+<!-- ▼ モード切替の実処理（復活） -->
+<script>
+/*
+ * switchViewMode(mode)
+ * - 選択されたモードに応じて描画関数を呼び分けます。
+ * - 例：space -> renderSpaceView('A'), kana -> renderKanaView('あ'), table -> renderPlainTable('all')
+ * - 描画後に setModeActive(mode) を呼んで、ボタンUIの状態も同期させてください。
+ */
+window.switchViewMode = function(mode) {
+  try {
+    if (mode === 'space') {
+      // サークル順：A から表示
+      renderSpaceView('A');
+    } else if (mode === 'kana') {
+      // 50音：あ行から表示
+      renderKanaView('あ');
+    } else if (mode === 'table') {
+      // 表：全件表示
+      renderPlainTable('all');
+    }
+  } catch (e) {
+    // 例外は握りつぶさず、開発時に気付きやすいようにログ出力
+    console.error('[switchViewMode] failed:', e);
+  }
+};
+</script>
+
 </body>
 </html>
