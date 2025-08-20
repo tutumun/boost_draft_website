@@ -7,7 +7,7 @@ name: Deploy Pages
 on:
   push:
     branches:
-      - Refactoring          # ← デプロイ対象ブランチ（大小文字を実ブランチ名と一致させる）
+      - main          # ← デプロイ対象ブランチ（大小文字を実ブランチ名と一致させる）
     paths:
       - "docs/**"           # docs/ 配下の変更で実行
       - ".github/workflows/deploy.yml"  # ワークフロー変更時も実行
