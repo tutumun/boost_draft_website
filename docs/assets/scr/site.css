@@ -418,3 +418,25 @@ section, section > h2, [id] { scroll-margin-top: var(--nav-h); }
 .navbar { position: static !important; }
 body { padding-top: 0; }
 }
+
+/* ナビゲーションを常に中央寄せにする */
+.navbar {
+  position: fixed !important;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  margin: 0 auto;           /* 全体を中央に配置 */
+  text-align: center;       /* 内部テキストも中央揃え */
+  width: 100%;              /* 横幅を画面全体に */
+}
+
+/* ナビゲーション内のリンク群を横並びで中央配置 */
+.navbar ul {
+  display: flex;
+  justify-content: center;  /* 中央寄せ */
+  align-items: center;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
