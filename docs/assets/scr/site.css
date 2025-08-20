@@ -348,3 +348,27 @@ nav.site-nav,
 /* 簡易フェードイン演出 */
 @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
 .fade-in { animation: fadeIn .18s ease-out; }
+
+/* さらに読み込むボタン */
+.load-more-btn {
+  display: inline-block;
+  margin: 1rem auto;
+  padding: 0.6rem 1.2rem;
+  font-size: 0.95rem;
+  font-weight: bold;
+  color: #fff;
+  background-color: #007bff; /* サイトのメインカラーに合わせる */
+  border: none;
+  border-radius: 6px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.1s;
+}
+
+.load-more-btn:hover {
+  background-color: #0056b3; /* hover時に濃く */
+}
+
+.load-more-btn:active {
+  transform: scale(0.97); /* 押下感を出す */
+}
